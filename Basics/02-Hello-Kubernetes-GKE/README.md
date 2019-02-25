@@ -170,7 +170,8 @@ hello-node   LoadBalancer   10.19.248.36   35.200.166.147   8080:30094/TCP   7m
 kubernetes   ClusterIP      10.19.240.1    <none>           443/TCP          46m
 ```
 
-Pointing my browser to the 35.200.166.147:8080 gives me this:
+Pointing my browser to 35.200.166.147:8080 gives me this:
+
 ![GKE Made a mistake](imgs/gke_3.png)
 
 The docker image exposes port 8000, however my deployment is telling the service to poll at port 8080. I am going to try to modify the port to 8000 in the deployment and see if it works.
@@ -199,7 +200,7 @@ service/hello-node exposed
 ```
 
 Yippy! The service is up and running :D
-![GKE Made a mistake](imgs/gke_4.png)
+![Browser pointing to the external IP and port](imgs/gke_4.png)
 
 ### Scaling up
 
@@ -273,9 +274,39 @@ $ kubectl get deployments -o wide
 NAME         DESIRED   CURRENT   UP-TO-DATE   AVAILABLE   AGE   CONTAINERS   IMAGES                                                     SELECTOR
 hello-node   4         4         4            4           9h    hello-node   asia.gcr.io/kubernetes-practice-219913/go-hello-world:v2   run=hello-node
 
-# Curl reults, there is now an extra parameter 'service_port'
+# Curl results, there is now an extra parameter 'service_port'
 $ curl 35.200.166.147:8000
 {"hostname":"hello-node-56855f7579-bccww","current_time":"2019-02-25T15:03:13.491607518Z","message":"Hello, World!","service_port":"8000"}
+```
+
+### Clean up time
+```sh
+# Before clean-up, list all the pods. I can see how the 4 pods are deployed across the 2 nodes. Not relevant, but interesting.
+$ kubectl get pods -o wide
+NAME                          READY   STATUS    RESTARTS   AGE   IP           NODE                                         NOMINATED NODE
+hello-node-56855f7579-8jklg   1/1     Running   0          5m    10.16.1.11   gke-hello-world-default-pool-15477176-13p4   <none>
+hello-node-56855f7579-bccww   1/1     Running   0          5m    10.16.1.12   gke-hello-world-default-pool-15477176-13p4   <none>
+hello-node-56855f7579-mw8m8   1/1     Running   0          5m    10.16.0.12   gke-hello-world-default-pool-15477176-9bkn   <none>
+hello-node-56855f7579-sgwqj   1/1     Running   0          5m    10.16.0.11   gke-hello-world-default-pool-15477176-9bkn   <none>
+
+# Delete the service. curl 35.200.166.147:8000 won't work anymore
+$ kubectl delete services hello-node
+
+# Delete the deployment
+$ kubectl delete deployments hello-node
+deployment.extensions "hello-node" deleted
+
+# Delete all images uploaded to GCR
+$ gcloud container images delete asia.gcr.io/kubernetes-practice-219913/go-hello-world:v1 --force-delete-tags
+$ gcloud container images delete asia.gcr.io/kubernetes-practice-219913/go-hello-world:v2 --force-delete-tags
+# Confirm all's gone
+$ gcloud container images list-tags asia.gcr.io/kubernetes-practice-219913/go-hello-world
+Listed 0 items.
+
+# Clean up local docker containers, images etc.
+$ docker container rm my-golang-app 
+$ docker image rm asia.gcr.io/kubernetes-practice-219913/go-hello-world:v1 asia.gcr.io/kubernetes-practice-219913/go-hello-world:v2 
+$ docker image rm golang:1.8
 ```
 
 ## Useful resources:
