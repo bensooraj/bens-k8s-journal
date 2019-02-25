@@ -96,6 +96,9 @@ Creating a deployment also creates pods and deploys them across the nodes.
 
 Check `kubectl`s current context
 ```sh
+# Check the complete list od contexts along withe other details
+$ kubectl config view
+
 # Check the current context
 $ kubectl config current-context
 gke_kubernetes-practice-219913_asia-south1-a_hello-world
@@ -141,7 +144,62 @@ hello-node   1         1         1            1           10m
 $ kubectl get pods
 NAME                          READY   STATUS    RESTARTS   AGE
 hello-node-57886b996d-65m8b   1/1     Running   0          10m
+
+# troubleshooting
+$ kubectl get events 
+$ kubectl logs <pod-name>
 ```
+
+### Allow external traffic via Services
+
+Expose the deployment
+```sh
+$ kubectl expose deployment hello-node --type="LoadBalancer"
+service/hello-node exposed
+```
+
+The Kubernetes master detects the `--type="LoadBalancer"` flag and creates the load-balancer provided by the underlying infrastructure (in this case the Compute Engine load balancer). Since the deployment (not the pod(s) directly) is exposed, the service will load balance traffic across all pods managed by the deployment (for now 1 pod).
+
+The Kubernetes master also creates relevant Compute Engine forwarding rules, target pools, and firewall rules to make the service fully accessible from outside of Google Cloud Platform.
+
+```sh
+# List the services
+$ kubectl get services
+NAME         TYPE           CLUSTER-IP     EXTERNAL-IP      PORT(S)          AGE
+hello-node   LoadBalancer   10.19.248.36   35.200.166.147   8080:30094/TCP   7m
+kubernetes   ClusterIP      10.19.240.1    <none>           443/TCP          46m
+```
+
+Pointing my browser to the 35.200.166.147:8080 gives me this:
+![GKE Made a mistake](imgs/gke_3.png)
+
+The docker image exposes port 8000, however my deployment is telling the service to poll at port 8080. I am going to try to modify the port to 8000 in the deployment and see if it works.
+```sh
+$ kubectl edit deployments hello-node
+spec:
+  ....
+  template:
+    ....
+    spec:
+      containers:
+      ....
+        ports:
+        - containerPort: 8080 # Changes this to 8000
+        ....
+
+# the deployment edit is automatically detected and applied to the pods 
+deployment.extensions/hello-node edited
+
+# Delete and re-create/expose the deployment
+$ kubectl delete service hello-node
+service "hello-node" deleted
+
+$ $ kubectl expose deployment hello-node --type="LoadBalancer"
+service/hello-node exposed
+```
+
+Yippy! The service is up and running :D
+![GKE Made a mistake](imgs/gke_4.png)
 
 ## Useful resources:
 
