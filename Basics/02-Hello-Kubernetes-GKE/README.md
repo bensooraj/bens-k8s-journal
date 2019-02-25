@@ -296,6 +296,21 @@ $ kubectl delete services hello-node
 $ kubectl delete deployments hello-node
 deployment.extensions "hello-node" deleted
 
+# List the gcloud k8s cluster we had created
+$ gcloud container clusters list 
+NAME         LOCATION       MASTER_VERSION  MASTER_IP      MACHINE_TYPE   NODE_VERSION  NUM_NODES  STATUS
+hello-world  asia-south1-a  1.11.7-gke.4    35.244.37.152  n1-standard-1  1.11.7-gke.4  2          RUNNING
+
+# And delete them
+$ gcloud container clusters delete hello-world
+The following clusters will be deleted.
+ - [hello-world] in [asia-south1-a]
+
+Do you want to continue (Y/n)?  Y
+
+Deleting cluster hello-world...done.                                                                                                                         
+Deleted [https://container.googleapis.com/v1/projects/kubernetes-practice-219913/zones/asia-south1-a/clusters/hello-world].
+
 # Delete all images uploaded to GCR
 $ gcloud container images delete asia.gcr.io/kubernetes-practice-219913/go-hello-world:v1 --force-delete-tags
 $ gcloud container images delete asia.gcr.io/kubernetes-practice-219913/go-hello-world:v2 --force-delete-tags
