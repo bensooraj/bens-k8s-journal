@@ -201,6 +201,37 @@ service/hello-node exposed
 Yippy! The service is up and running :D
 ![GKE Made a mistake](imgs/gke_4.png)
 
+### Scaling up
+
+```sh
+# Instructs the replication controller to update the number of pods
+$ kubectl scale deployment --replicas=4 hello-node
+deployment.extensions/hello-node scaled
+
+# Check the number of pods
+$ kubectl get pods
+NAME                         READY   STATUS              RESTARTS   AGE
+hello-node-946c5d5cb-cqlj4   1/1     Running             0          21s
+hello-node-946c5d5cb-f8zs4   0/1     ContainerCreating   0          21s
+hello-node-946c5d5cb-hx26m   1/1     Running             0          21s
+hello-node-946c5d5cb-hx2zc   1/1     Running             0          8h
+
+# List the deployment as well
+$ kubectl get deployments.
+NAME         DESIRED   CURRENT   UP-TO-DATE   AVAILABLE   AGE
+hello-node   4         4         4            4           8h
+```
+
+Multiple `curl`s to `35.200.166.147:8000` throws different results:
+```sh
+$ curl 35.200.166.147:8000
+{"hostname":"hello-node-946c5d5cb-hx2zc","current_time":"2019-02-25T14:35:14.916556154Z","message":"Hello, World!"}
+
+{"hostname":"hello-node-946c5d5cb-cqlj4","current_time":"2019-02-25T14:37:02.407322405Z","message":"Hello, World!"}
+
+{"hostname":"hello-node-946c5d5cb-hx26m","current_time":"2019-02-25T14:37:18.8091839Z","message":"Hello, World!"}
+```
+
 ## Useful resources:
 
 * [`gcloud`: Container Registry | Managing images][1]
