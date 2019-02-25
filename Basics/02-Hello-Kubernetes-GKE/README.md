@@ -56,6 +56,9 @@ DIGEST        TAGS  TIMESTAMP
 
 ## Kubernetes
 
+
+### Create the cluster
+
 Question: 
 > How do I point the kubectl installed on my local machine to the `gcloud` cluster?
 
@@ -88,6 +91,57 @@ hello-world  asia-south1-a  1.11.7-gke.4    35.244.37.152  n1-standard-1  1.11.7
 The `Kubernetes Engine => Clusters` UI looks like the following:
 ![GKE Cluster View](imgs/gke_1.png)
 
+### Create the Deployment
+Creating a deployment also creates pods and deploys them across the nodes.
+
+Check `kubectl`s current context
+```sh
+# Check the current context
+$ kubectl config current-context
+gke_kubernetes-practice-219913_asia-south1-a_hello-world
+
+# Create the deployment
+$ kubectl run hello-node \
+    --image=asia.gcr.io/kubernetes-practice-219913/go-hello-world:v1 \
+    --port=8080
+
+deployment.apps/hello-node created
+```
+
+Got the following warning as well (need to check this out later):
+> `kubectl run --generator=deployment/apps.v1beta1` is DEPRECATED and will be removed in a future version. Use `kubectl create` instead.
+
+The GKE => Workloads UI now looks like this:
+![GKE Workloads View](imgs/gke_2.png)
+
+Check some basic details
+```sh
+# List the nodes
+$ kubectl cluster-info
+# Kubernetes master is running at https://35.244.37.152
+# GLBCDefaultBackend is running at https://35.244.37.152/api/v1/namespaces/kube-system/services/default-http-backend:http/proxy
+# Heapster is running at https://35.244.37.152/api/v1/namespaces/kube-system/services/heapster/proxy
+# KubeDNS is running at https://35.244.37.152/api/v1/namespaces/kube-system/services/kube-dns:dns/proxy
+# Metrics-server is running at https://35.244.37.152/api/v1/namespaces/kube-system/services/https:metrics-server:/proxy
+
+To further debug and diagnose cluster problems, use 'kubectl cluster-info dump'.
+
+# List the nodes
+$ kubectl get nodes
+NAME                                         STATUS   ROLES    AGE   VERSION
+gke-hello-world-default-pool-15477176-13p4   Ready    <none>   27m   v1.11.7-gke.4
+gke-hello-world-default-pool-15477176-9bkn   Ready    <none>   27m   v1.11.7-gke.4
+
+# List the deployment
+$ kubectl get deployments
+NAME         DESIRED   CURRENT   UP-TO-DATE   AVAILABLE   AGE
+hello-node   1         1         1            1           10m
+
+# and the pods
+$ kubectl get pods
+NAME                          READY   STATUS    RESTARTS   AGE
+hello-node-57886b996d-65m8b   1/1     Running   0          10m
+```
 
 ## Useful resources:
 
