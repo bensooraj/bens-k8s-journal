@@ -232,6 +232,52 @@ $ curl 35.200.166.147:8000
 {"hostname":"hello-node-946c5d5cb-hx26m","current_time":"2019-02-25T14:37:18.8091839Z","message":"Hello, World!"}
 ```
 
+# Rolling out an upgrade
+```sh
+# Modified the go hello-world program to return an additional key `service_port`
+# which picks up the value of the environment variable HELLO_NODE_SERVICE_PORT from
+# the running pod
+
+# Build the new image
+$ docker build -t asia.gcr.io/kubernetes-practice-219913/go-hello-world:v2 .
+
+# Push the image to Google Container Registry
+$ docker push asia.gcr.io/kubernetes-practice-219913/go-hello-world:v2
+
+# The new tags are appearing in the listing as well
+$ gcloud container images list-tags asia.gcr.io/kubernetes-practice-219913/go-hello-world
+DIGEST        TAGS  TIMESTAMP
+3872a103b83a  v2    2019-02-25T20:21:33
+673ae58f6fda  v1    2019-02-25T09:39:36
+```
+
+Yup! I can see that the new image has been uploaded:
+![New image uploaded](imgs/gcr_2.png)
+
+Edit the deployment config YAML and update the image tag at `spec.template.spec.containers.image`
+```sh
+$ kubectl edit deployments hello-node
+spec:
+  ....
+  template:
+    ....
+    spec:
+      containers:
+      - image: asia.gcr.io/kubernetes-practice-219913/go-hello-world:v1 # Modify v1 to v2
+
+# Edit, save and quit (:wq)
+deployment.extensions/hello-node edited
+
+# Listing the deployment that the image tag version has been updated
+$ kubectl get deployments -o wide
+NAME         DESIRED   CURRENT   UP-TO-DATE   AVAILABLE   AGE   CONTAINERS   IMAGES                                                     SELECTOR
+hello-node   4         4         4            4           9h    hello-node   asia.gcr.io/kubernetes-practice-219913/go-hello-world:v2   run=hello-node
+
+# Curl reults, there is now an extra parameter 'service_port'
+$ curl 35.200.166.147:8000
+{"hostname":"hello-node-56855f7579-bccww","current_time":"2019-02-25T15:03:13.491607518Z","message":"Hello, World!","service_port":"8000"}
+```
+
 ## Useful resources:
 
 * [`gcloud`: Container Registry | Managing images][1]
