@@ -233,7 +233,7 @@ $ curl 35.200.166.147:8000
 {"hostname":"hello-node-946c5d5cb-hx26m","current_time":"2019-02-25T14:37:18.8091839Z","message":"Hello, World!"}
 ```
 
-# Rolling out an upgrade
+### Rolling out an upgrade
 ```sh
 # Modified the go hello-world program to return an additional key `service_port`
 # which picks up the value of the environment variable HELLO_NODE_SERVICE_PORT from
