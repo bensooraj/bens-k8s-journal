@@ -135,6 +135,63 @@ default-token-lk5xg   kubernetes.io/service-account-token   3      1h
 mysql                 Opaque                                1      28s
 ```
 
+Time to start with the MySQL deployment. The MySQL deployment manifest file `mysql.yaml` would like the following:
+```yaml
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: mysql
+  labels:
+    app: mysql
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: mysql
+  template:
+    metadata:
+      labels:
+        app: mysql
+    spec:
+      containers:
+        - image: mysql:5.6
+          name: mysql
+          env:
+            - name: MYSQL_ROOT_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: mysql
+                  key: password
+          ports:
+            - containerPort: 3306
+              name: mysql
+          volumeMounts:
+            - name: mysql-persistent-storage
+              mountPath: /var/lib/mysql
+      volumes:
+        - name: mysql-persistent-storage
+          persistentVolumeClaim:
+            claimName: mysql-volumeclaim
+```
+
+Create the deployment:
+```sh
+#
+$ kubectl create -f deployments/mysql.yaml
+deployment.apps/mysql created
+
+# List the deployments
+$ kubectl get deployments.
+NAME    DESIRED   CURRENT   UP-TO-DATE   AVAILABLE   AGE
+mysql   1         1         1            1           57s
+
+# List pods
+$ kubectl get pods -l app=mysql
+NAME                     READY   STATUS    RESTARTS   AGE
+mysql-5bfd5f74dd-mbbf5   1/1     Running   0          2m
+
+```
+
 [1]: https://cloud.google.com/kubernetes-engine/docs/tutorials/persistent-disk
 [2]: https://kubernetes.io/docs/concepts/storage/storage-classes/
 [3]: https://cloud.google.com/persistent-disk/
