@@ -63,6 +63,56 @@ CURRENT   NAME                                                         CLUSTER  
 $ kubectl config current-context
 gke_kubernetes-practice-219913_asia-south1-a_k8s-wordpress
 ```
+To use an existing GKE cluster, use the following command `gcloud container clusters get-credentials [cluster-name]`.
+
+### Create `PersistentVolumes` and `PersistentVolumeClaims`
+
+Important points to remember:
+* When a `PersistentVolumeClaim` is created, if there is no existing `PersistentVolume` for it to bind to, k8s dynamically provisions a new `PersistentVolume` based on the `StorageClass` configuration.
+* When a `StorageClass` is not specified in the `PersistentVolumeClaim`, the cluster's default `StorageClass` is used instead.
+* GKE(GKE) has a default `StorageClass` installed that dynamically provisions `PersistentVolumes` backed by [persistent disks][3].
+
+The `mysql-volumeclaim.yaml` file would like the following:
+```yaml
+kind: PersistentVolumeClaim
+apiVersion: v1
+metadata:
+  name: mysql-volumeclaim
+spec:
+  accessModes:
+    - ReadWriteOnce
+  resources:
+    requests:
+      storage: 200Gi
+```
+and the `wordpress-volumeclaim.yaml`:
+```yaml
+kind: PersistentVolumeClaim
+apiVersion: v1
+metadata:
+  name: wordpress-volumeclaim
+spec:
+  accessModes:
+    - ReadWriteOnce
+  resources:
+    requests:
+      storage: 200Gi
+```
+Now:
+```sh
+# deploy the two PersistentVolumeClaim manifests
+$ kubectl apply -f pvcs/mysql-volumeclaim.yaml
+persistentvolumeclaim/mysql-volumeclaim created
+
+$ kubectl apply -f pvcs/wordpress-volumeclaim.yaml
+persistentvolumeclaim/wordpress-volumeclaim created
+
+# List out the [PersistentVolumeClaim]s
+$ kubectl get pvc
+NAME                    STATUS   VOLUME                                     CAPACITY   ACCESS MODES   STORAGECLASS   AGE
+mysql-volumeclaim       Bound    pvc-8cb222da-3f7d-11e9-bbe6-42010aa001a3   200Gi      RWO            standard       12m
+wordpress-volumeclaim   Bound    pvc-9174b903-3f7d-11e9-bbe6-42010aa001a3   200Gi      RWO            standard       12m
+```
 
 [1]: https://cloud.google.com/kubernetes-engine/docs/tutorials/persistent-disk
 [2]: https://kubernetes.io/docs/concepts/storage/storage-classes/
