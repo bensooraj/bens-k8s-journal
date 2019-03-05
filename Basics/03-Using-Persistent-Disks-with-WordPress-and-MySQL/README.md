@@ -43,6 +43,27 @@ NAME           LOCATION       MASTER_VERSION  MASTER_IP       MACHINE_TYPE   NOD
 k8s-wordpress  asia-south1-a  1.11.7-gke.4    35.200.213.246  n1-standard-1  1.11.7-gke.4  3          RUNNING
 ```
 
+Creating a GKE cluster using `gcloud` automatically makes an entry in the kubconfig file and also set the current context for `kubectl`. Let's verify:
+```sh
+# Get all clusters the local kubectl instance has accesses to. Pay attention the listing gke_kubernetes-practice-219913_asia-south1-a_k8s-wordpress
+$ kubectl config get-clusters
+NAME
+docker-for-desktop-cluster
+gke_kubernetes-practice-219913_asia-south1-a_k8s-wordpress
+minikube
+
+# Checkout all the the existing context. You can use `gcloud config view` as well.
+$ kubectl config get-contexts
+CURRENT   NAME                                                         CLUSTER                                                      AUTHINFO                                                     NAMESPACE
+          docker-for-desktop                                           docker-for-desktop-cluster                                   docker-for-desktop                                           
+*         gke_kubernetes-practice-219913_asia-south1-a_k8s-wordpress   gke_kubernetes-practice-219913_asia-south1-a_k8s-wordpress   gke_kubernetes-practice-219913_asia-south1-a_k8s-wordpress   
+          minikube                                                     minikube                                                     minikube                                                     
+
+# And the current context is set to:
+$ kubectl config current-context
+gke_kubernetes-practice-219913_asia-south1-a_k8s-wordpress
+```
+
 [1]: https://cloud.google.com/kubernetes-engine/docs/tutorials/persistent-disk
 [2]: https://kubernetes.io/docs/concepts/storage/storage-classes/
 [3]: https://cloud.google.com/persistent-disk/
