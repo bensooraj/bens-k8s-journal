@@ -120,6 +120,12 @@ pvc-8cb222da-3f7d-11e9-bbe6-42010aa001a3   200Gi      RWO            Delete     
 pvc-9174b903-3f7d-11e9-bbe6-42010aa001a3   200Gi      RWO            Delete           Bound    default/wordpress-volumeclaim   standard                25m
 ```
 
+A look at the `GKE => Storage` UI section:
+![PVCs](imgs/pvc-1.png)
+
+And the default `storageClass` provided by the uderlying cloud provider (GCP => Persistent Disks):
+![StorageClass](imgs/storage-class-1.png)
+
 ### Set up MySQL
 
 Get ready with the secrets, this will be passed on to the MySQL docker container.
@@ -189,8 +195,9 @@ mysql   1         1         1            1           57s
 $ kubectl get pods -l app=mysql
 NAME                     READY   STATUS    RESTARTS   AGE
 mysql-5bfd5f74dd-mbbf5   1/1     Running   0          2m
-
 ```
+The `GCP UI => GKE => Workloads` UI:
+![MySQL Workload](imgs/workload-mysql-1.png)
 
 [1]: https://cloud.google.com/kubernetes-engine/docs/tutorials/persistent-disk
 [2]: https://kubernetes.io/docs/concepts/storage/storage-classes/
