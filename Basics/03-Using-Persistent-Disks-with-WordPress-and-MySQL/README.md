@@ -199,6 +199,39 @@ mysql-5bfd5f74dd-mbbf5   1/1     Running   0          2m
 The `GCP UI => GKE => Workloads` UI:
 ![MySQL Workload](imgs/workload-mysql-1.png)
 
+### Expose the MySQL deployment via Services
+
+The service manifest file (`mysql-service.yaml`) for exposing the MySQL deployment looks like the following:
+```yaml
+apiVersion: v1
+kind: Service
+metadata:
+  name: mysql
+  labels:
+    app: mysql
+spec:
+  type: ClusterIP
+  ports:
+    - port: 3306
+  selector:
+    app: mysql
+```
+
+Then:
+```sh
+# Deploy the service
+$ kubectl create -f services/mysql-service.yaml
+service/mysql created
+
+# List the service
+$ kubectl get service
+NAME         TYPE        CLUSTER-IP      EXTERNAL-IP   PORT(S)    AGE
+kubernetes   ClusterIP   10.59.240.1     <none>        443/TCP    3h
+mysql        ClusterIP   10.59.252.117   <none>        3306/TCP   21s
+```
+`GKE => Services` UI:
+![MySQL Services](imgs/service-1.png)
+
 [1]: https://cloud.google.com/kubernetes-engine/docs/tutorials/persistent-disk
 [2]: https://kubernetes.io/docs/concepts/storage/storage-classes/
 [3]: https://cloud.google.com/persistent-disk/
