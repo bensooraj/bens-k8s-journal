@@ -112,6 +112,27 @@ $ kubectl get pvc
 NAME                    STATUS   VOLUME                                     CAPACITY   ACCESS MODES   STORAGECLASS   AGE
 mysql-volumeclaim       Bound    pvc-8cb222da-3f7d-11e9-bbe6-42010aa001a3   200Gi      RWO            standard       12m
 wordpress-volumeclaim   Bound    pvc-9174b903-3f7d-11e9-bbe6-42010aa001a3   200Gi      RWO            standard       12m
+
+# And of course, the volumes themselves
+$ kubectl get persistentvolumes
+NAME                                       CAPACITY   ACCESS MODES   RECLAIM POLICY   STATUS   CLAIM                           STORAGECLASS   REASON   AGE
+pvc-8cb222da-3f7d-11e9-bbe6-42010aa001a3   200Gi      RWO            Delete           Bound    default/mysql-volumeclaim       standard                25m
+pvc-9174b903-3f7d-11e9-bbe6-42010aa001a3   200Gi      RWO            Delete           Bound    default/wordpress-volumeclaim   standard                25m
+```
+
+### Set up MySQL
+
+Get ready with the secrets, this will be passed on to the MySQL docker container.
+```sh
+# Create a secret for MySQL DB root password:
+$ kubectl create secret generic mysql --from-literal=password=dbpassword
+secret/mysql created
+
+# List the secrets
+$ kubectl get secrets
+NAME                  TYPE                                  DATA   AGE
+default-token-lk5xg   kubernetes.io/service-account-token   3      1h
+mysql                 Opaque                                1      28s
 ```
 
 [1]: https://cloud.google.com/kubernetes-engine/docs/tutorials/persistent-disk
