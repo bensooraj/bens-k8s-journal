@@ -336,11 +336,20 @@ wordpress   LoadBalancer   10.59.240.86   35.200.158.144   80:32689/TCP   1m    
 ```
 
 An unnecessary verification in the GKE UI:
+
 Workloads:
 ![WordPress Workloads](imgs/workload-wordpress-1.png)
+
 Services:
 ![WordPress Service](imgs/service-2.png)
 
+### Checkout the new WordPress blog
+
+Navigating to `35.200.158.144` presents you with the following:
+![WordPress Blog Setup](imgs/blog-1.png)
+
+Created a sample blog (found the image on reddit 😂):
+![WordPress Blog 1](imgs/blog-2.png)
 
 [1]: https://cloud.google.com/kubernetes-engine/docs/tutorials/persistent-disk
 [2]: https://kubernetes.io/docs/concepts/storage/storage-classes/
