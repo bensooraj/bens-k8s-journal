@@ -351,6 +351,32 @@ Navigating to `35.200.158.144` presents you with the following:
 Created a sample blog (found the image on reddit 😂):
 ![WordPress Blog 1](imgs/blog-2.png)
 
+### Data persistence on failure
+
+```sh
+# List out all the pods
+$ kubectl get pods -o wide
+NAME                         READY   STATUS    RESTARTS   AGE   IP          NODE                                           NOMINATED NODE
+mysql-5bfd5f74dd-mbbf5       1/1     Running   0          7h    10.56.1.6   gke-k8s-wordpress-default-pool-dda7aa74-lpf1   <none>
+wordpress-78c9b8d684-6r295   1/1     Running   0          44m   10.56.2.5   gke-k8s-wordpress-default-pool-dda7aa74-mvc4   <none>
+
+# Delete the mysql pods (can take a few seconds)
+$ kubectl delete pods -l app=mysql
+pod "mysql-5bfd5f74dd-mbbf5" deleted
+
+# Listing out pods again shows that a new one is immediately created
+$ kubectl get pods -o wide
+NAME                         READY   STATUS    RESTARTS   AGE   IP          NODE                                           NOMINATED NODE
+mysql-5bfd5f74dd-7r6sx       1/1     Running   0          33s   10.56.1.7   gke-k8s-wordpress-default-pool-dda7aa74-lpf1   <none>
+wordpress-78c9b8d684-6r295   1/1     Running   0          45m   10.56.2.5   gke-k8s-wordpress-default-pool-dda7aa74-mvc4   <none>
+```
+
+The dummy blog that I created is still up!
+![WordPress Blog 2](imgs/blog-3.png)
+
+I am liking this! :)
+
+
 [1]: https://cloud.google.com/kubernetes-engine/docs/tutorials/persistent-disk
 [2]: https://kubernetes.io/docs/concepts/storage/storage-classes/
 [3]: https://cloud.google.com/persistent-disk/
