@@ -141,6 +141,9 @@ default-token-lk5xg   kubernetes.io/service-account-token   3      1h
 mysql                 Opaque                                1      28s
 ```
 
+You can see this created in the UI as well (`GKE => Configurations`):
+![secrets](imgs/secrets-1.png)
+
 Time to start with the MySQL deployment. The MySQL deployment manifest file `mysql.yaml` would like the following:
 ```yaml
 apiVersion: apps/v1
@@ -232,8 +235,116 @@ mysql        ClusterIP   10.59.252.117   <none>        3306/TCP   21s
 `GKE => Services` UI:
 ![MySQL Services](imgs/service-1.png)
 
+### Set up WordPress
+
+Deploy wordpress using the `wordpress.yaml` manifest file:
+```yaml
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: wordpress
+  labels:
+    app: wordpress
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: wordpress
+  template:
+    metadata:
+      labels:
+        app: wordpress
+    spec:
+      containers:
+        - image: wordpress
+          name: wordpress
+          env:
+          - name: WORDPRESS_DB_HOST
+            value: mysql:3306
+          - name: WORDPRESS_DB_PASSWORD
+            valueFrom:
+              secretKeyRef:
+                name: mysql
+                key: password
+          ports:
+            - containerPort: 80
+              name: wordpress
+          volumeMounts:
+            - name: wordpress-persistent-storage
+              mountPath: /var/www/html
+      volumes:
+        - name: wordpress-persistent-storage
+          persistentVolumeClaim:
+            claimName: wordpress-volumeclaim
+```
+
+Pay attention to the value set for the `env` variable `WORDPRESS_DB_HOST`: `mysql:3306`.
+> We can refer to the database as `mysql`, because of [Kubernetes DNS][6] allows `Pods` to communicate a `Service` by its name.
+
+```sh
+# Deploy
+$ kubectl create -f deployments/wordpress.yaml
+deployment.apps/wordpress created
+
+# List the deployments
+$ kubectl get deployments -o wide
+NAME        DESIRED   CURRENT   UP-TO-DATE   AVAILABLE   AGE   CONTAINERS   IMAGES      SELECTOR
+mysql       1         1         1            1           7h    mysql        mysql:5.6   app=mysql
+wordpress   1         1         1            1           1m    wordpress    wordpress   app=wordpress
+
+# And Pods
+$ kubectl get pod -l app=wordpress
+NAME                         READY   STATUS    RESTARTS   AGE
+wordpress-78c9b8d684-6r295   1/1     Running   0          2m
+```
+
+Time to expose the wordpress service now:
+```yaml
+apiVersion: v1
+kind: Service
+metadata:
+  labels:
+    app: wordpress
+  name: wordpress
+spec:
+  type: LoadBalancer
+  ports:
+    - port: 80
+      targetPort: 80
+      protocol: TCP
+  selector:
+    app: wordpress
+```
+Go ahead and deploy:
+
+```sh
+# Deploy/Create the Service
+$ kubectl create -f services/wordpress-service.yaml
+service/wordpress created
+
+# List
+$ kubectl get service -o wide
+NAME         TYPE           CLUSTER-IP      EXTERNAL-IP   PORT(S)        AGE   SELECTOR
+kubernetes   ClusterIP      10.59.240.1     <none>        443/TCP        10h   <none>
+mysql        ClusterIP      10.59.252.117   <none>        3306/TCP       6h    app=mysql
+wordpress    LoadBalancer   10.59.240.86    <pending>     80:32689/TCP   40s   app=wordpress
+
+# Narrow down the listing with labels
+$ kubectl get service -o wide -l app=wordpress
+NAME        TYPE           CLUSTER-IP     EXTERNAL-IP      PORT(S)        AGE   SELECTOR
+wordpress   LoadBalancer   10.59.240.86   35.200.158.144   80:32689/TCP   1m    app=wordpress
+```
+
+An unnecessary verification in the GKE UI:
+Workloads:
+![WordPress Workloads](imgs/workload-wordpress-1.png)
+Services:
+![WordPress Service](imgs/service-2.png)
+
+
 [1]: https://cloud.google.com/kubernetes-engine/docs/tutorials/persistent-disk
 [2]: https://kubernetes.io/docs/concepts/storage/storage-classes/
 [3]: https://cloud.google.com/persistent-disk/
 [4]: https://aws.amazon.com/ebs/
 [5]: https://kubernetes.io/docs/tutorials/stateful-application/basic-stateful-set/
+[6]: https://kubernetes.io/docs/concepts/services-networking/dns-pod-service/
