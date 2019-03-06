@@ -376,6 +376,12 @@ The dummy blog that I created is still up!
 
 I am liking this! :)
 
+### Updating the image application
+is as simple as this:
+1. Checkout the newest version from Docker hub
+2. Open the relevant deployment manifest file
+3. Update the `image:tag` value under `spec.template.spec.containers.image`
+4. Deploy the changes using `kubectl apply -f wordpress.yaml`
 
 [1]: https://cloud.google.com/kubernetes-engine/docs/tutorials/persistent-disk
 [2]: https://kubernetes.io/docs/concepts/storage/storage-classes/
