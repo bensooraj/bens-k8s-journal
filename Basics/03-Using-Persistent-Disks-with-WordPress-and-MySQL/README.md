@@ -383,9 +383,49 @@ is as simple as this:
 3. Update the `image:tag` value under `spec.template.spec.containers.image`
 4. Deploy the changes using `kubectl apply -f wordpress.yaml`
 
+
+### Clean up
+
+```sh
+# Delete the wordpress Service, to deallocate the Cloud Load Balancer created
+$ kubectl delete service wordpress
+service "wordpress" deleted
+
+# Since the above operation is asynchronous, verify using
+$ gcloud compute forwarding-rules list 
+NAME                              REGION       IP_ADDRESS      IP_PROTOCOL  TARGET
+a443ce0893fc711e9bbe642010aa001a  asia-south1  35.200.158.144  TCP          asia-south1/targetPools/a443ce0893fc711e9bbe642010aa001a
+
+# And, run it again!
+$ gcloud compute forwarding-rules list
+Listed 0 items.
+
+# Delete PVCs; will automatically trigger deletion of the provisioned PVs and Persistent Disks as well
+$ kubectl delete pvc wordpress-volumeclaim
+persistentvolumeclaim "wordpress-volumeclaim" deleted
+
+$ kubectl delete pvc mysql-volumeclaim
+persistentvolumeclaim "mysql-volumeclaim" deleted
+
+# Take down the cluster:
+$ gcloud container clusters delete k8s-wordpress
+The following clusters will be deleted.
+ - [k8s-wordpress] in [asia-south1-a]
+
+Do you want to continue (Y/n)?  Y
+
+Deleting cluster k8s-wordpress...⠼
+Deleting cluster k8s-wordpress...done.
+Deleted [https://container.googleapis.com/v1/projects/kubernetes-practice-219913/zones/asia-south1-a/clusters/k8s-wordpress].
+```
+
+Useful resource to read:
+* [PV is stuck at terminating after PVC is deleted][7]: Sometimes, `PVC`s deletion can hang. Apparently, that is because of something called as `finalizers`, which protects the underlying `PV`. I don't understand this fully yet. Edit the `PVC` yaml, remove the `finalizers` which has a value of sorts `- kubernetes.io/pv-protection` and `save`+`quit`. Done! Just a patch work, not a solution I guess.
+
 [1]: https://cloud.google.com/kubernetes-engine/docs/tutorials/persistent-disk
 [2]: https://kubernetes.io/docs/concepts/storage/storage-classes/
 [3]: https://cloud.google.com/persistent-disk/
 [4]: https://aws.amazon.com/ebs/
 [5]: https://kubernetes.io/docs/tutorials/stateful-application/basic-stateful-set/
 [6]: https://kubernetes.io/docs/concepts/services-networking/dns-pod-service/
+[7]: https://github.com/kubernetes/kubernetes/issues/69697
