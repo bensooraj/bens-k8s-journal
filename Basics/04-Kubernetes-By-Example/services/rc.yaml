@@ -1,0 +1,19 @@
+apiVersion: v1
+kind: ReplicationController
+metadata:
+  name: rc-sise
+spec:
+  replicas: 2
+  selector:
+    app: rc-sise
+  template:
+    metadata:
+      name: rc-sise
+      labels:
+        app: rc-sise
+    spec:
+      containers:
+        - name: rc-sise
+          image: mhausenblas/simpleservice:0.5.0
+          ports:
+            - containerPort: 9876

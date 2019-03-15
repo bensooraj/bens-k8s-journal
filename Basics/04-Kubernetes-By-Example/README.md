@@ -7,6 +7,7 @@ This is a journal of me walking through the entire [Kubernetes By Example][1] ex
 3. [Pods](#pods)
 4. [Labels](#labels)
 5. [Deployments](#deployments)
+6. [Services](#services)
 
 ### Check config details
 ```sh
@@ -460,6 +461,27 @@ $ kubectl get pods -w
 NAME                               READY   STATUS        RESTARTS   AGE
 sise-deployment-6b9688f8f5-74fnz   1/1     Terminating   0          6m27s
 sise-deployment-6b9688f8f5-gglnk   1/1     Terminating   0          6m29s
+```
+
+### Services
+
+> A service is an abstraction for pods, providing a stable, so called virtual IP (`VIP`) address. While pods may come and go and with it their IP addresses, a service allows clients to reliably connect to the containers running in the pod using the VIP. The `virtual` in VIP means it is not an actual IP address connected to a network interface, but its purpose is purely to forward traffic to one or more pods. Keeping the mapping between the VIP and the pods up-to-date is the job of `kube-proxy`, a process that runs on every node, which queries the API server to learn about new services in the cluster.
+
+```sh
+# Create the ReplicationController from rc.yaml
+$ kubectl apply -f services/rc.yaml
+
+# Check the ReplicationController created
+$ kubectl get replicationcontrollers -o wide
+NAME      DESIRED   CURRENT   READY   AGE   CONTAINERS   IMAGES                            SELECTOR
+rc-sise   2         2         2       50s   rc-sise      mhausenblas/simpleservice:0.5.0   app=rc-sise
+
+# And the pods
+$ kubectl get pod --show-labels -o wide
+NAME            READY   STATUS    RESTARTS   AGE   IP          NODE                                            NOMINATED NODE   LABELS
+rc-sise-24vg4   1/1     Running   0          1m    10.12.1.9   gke-k8s-by-example-default-pool-5574bdde-dnnl   <none>           app=rc-sise
+rc-sise-dm4p8   1/1     Running   0          1m    10.12.2.8   gke-k8s-by-example-default-pool-5574bdde-gkhk   <none>           app=rc-sise
+
 ```
 
 [1]: http://kubernetesbyexample.com
