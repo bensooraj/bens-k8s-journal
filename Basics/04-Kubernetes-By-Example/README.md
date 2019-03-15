@@ -179,7 +179,7 @@ labelex   0/1     ImagePullBackOff   0          31s
 
 Oops! Looks like I made some mistake while specifying the image for the container. Let me checkout what went wrong using the `describe` command:
 ```sh
-$ $ kubectl describe pods labelex
+$ kubectl describe pods labelex
 Name:               labelex
 Namespace:          default
 Priority:           0
@@ -203,6 +203,95 @@ Events:
   Warning  Failed          4m5s (x3 over 5m4s)   kubelet, gke-k8s-by-example-default-pool-41076e94-4n53  Error: ErrImagePull
   Normal   BackOff         3m26s (x7 over 5m2s)  kubelet, gke-k8s-by-example-default-pool-41076e94-4n53  Back-off pulling image "mhausenblas/simpleservice:0.5."
   Warning  Failed          3s (x19 over 5m2s)    kubelet, gke-k8s-by-example-default-pool-41076e94-4n53  Error: ImagePullBackOff
+```
+
+Skimming through the `Events` section I found:
+
+`Failed to pull image "mhausenblas/simpleservice:0.5.": rpc error: code = Unknown desc = Error response from daemon: manifest for mhausenblas/simpleservice:0.5. not found`
+
+
+Lol! I mentioned the wrong image name(`mhausenblas/simpleservice:0.5.` instead of `mhausenblas/simpleservice:0.5.0`). Let me correct that and apply the changes:
+
+```sh
+# This time the image is successfully pulled
+$ kubectl describe pods labelex
+# Events:
+#  Type     Reason          Age                   From                                                    Message
+#   ----     ------          ----                  ----                                                    -------
+#  Normal   Pulled          68s                   kubelet, gke-k8s-by-example-default-pool-41076e94-4n53  Successfully pulled image "mhausenblas/simpleservice:0.5.0"
+
+# List the pod created
+$ kubectl get pods
+NAME      READY   STATUS    RESTARTS   AGE
+labelex   1/1     Running   0          11m
+
+# Show the labels as well
+$ kubectl get pods --show-labels
+NAME      READY   STATUS    RESTARTS   AGE   LABELS
+labelex   1/1     Running   0          15m   env=development
+
+# Filter by the label now
+$ kubectl get pods -l env=development
+NAME      READY   STATUS    RESTARTS   AGE
+labelex   1/1     Running   0          16m
+
+# Add a label to the pod
+$ kubectl label pods labelex ownwer=bensooraj
+pod/labelex labeled
+
+# List them out again
+$ kubectl get pods --show-labels
+NAME      READY   STATUS    RESTARTS   AGE   LABELS
+labelex   1/1     Running   0          17m   env=development,ownwer=bensooraj
+
+# Filter by the new label.
+$ kubectl get pods --selector ownwer=bensooraj
+NAME      READY   STATUS    RESTARTS   AGE
+labelex   1/1     Running   0          19m
+
+```
+I am really sorry for the spelling mistake with the label `ownwer=bensooraj`. It hurts my eyes.
+
+Anyways, `--selector` and `-l` mean the same thing.
+
+#### Set based selectors
+
+> Kubernetes objects also support set-based selectors
+
+We will launch another pod that has two labels (env=production and owner=bensooraj)
+```sh
+# Create a new pod using labels/labels-2.yaml
+$ kubectl apply -f labels/labels-2.yaml
+
+# List out all the pods along with the labels
+$ kubectl get pods --show-labels
+NAME       READY   STATUS    RESTARTS   AGE   LABELS
+labelex    1/1     Running   0          57m   env=development,ownwer=bensooraj
+labelex2   1/1     Running   0          2m    env=production,owner=bensooraj
+
+# Let's get fancy here with selecting the labels
+$ kubectl get pods --show-labels -l 'env in (development)'
+NAME      READY   STATUS    RESTARTS   AGE   LABELS
+labelex   1/1     Running   0          57m   env=development,ownwer=bensooraj
+
+# The following lists all pods that are either labelled with env=development or with env=production
+$ kubectl get pods --show-labels -l 'env in (development, production)'
+NAME       READY   STATUS    RESTARTS   AGE   LABELS
+labelex    1/1     Running   0          57m   env=development,ownwer=bensooraj
+labelex2   1/1     Running   0          3m    env=production,owner=bensooraj
+```
+
+I can even delete pods like that:
+```sh
+$ kubectl delete pods -l 'env in (development, production)'
+pod "labelex" deleted
+pod "labelex2" deleted
+
+# You can see them getting terminated
+$ kubectl get pods -w
+NAME       READY   STATUS        RESTARTS   AGE
+labelex    1/1     Terminating   0          61m
+labelex2   1/1     Terminating   0          6m34s
 ```
 
 [1]: http://kubernetesbyexample.com
