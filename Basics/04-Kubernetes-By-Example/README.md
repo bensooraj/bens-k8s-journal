@@ -148,6 +148,9 @@ Creating pods with resource limits
           memory: "64Mi" 
           cpu: "500m"
 
+# Create the pod
+kubectl apply -f pod/constraint-pod.yaml
+
 # List the pods
 $ kubectl get pods
 NAME                    READY   STATUS    RESTARTS   AGE
