@@ -467,8 +467,8 @@ sise-deployment-6b9688f8f5-gglnk   1/1     Terminating   0          6m29s
 
 > A service is an abstraction for pods, providing a stable, so called virtual IP (`VIP`) address. While pods may come and go and with it their IP addresses, a service allows clients to reliably connect to the containers running in the pod using the VIP. The `virtual` in VIP means it is not an actual IP address connected to a network interface, but its purpose is purely to forward traffic to one or more pods. Keeping the mapping between the VIP and the pods up-to-date is the job of `kube-proxy`, a process that runs on every node, which queries the API server to learn about new services in the cluster.
 
+Create the ReplicationController from `rc.yaml`:
 ```sh
-# Create the ReplicationController from rc.yaml
 $ kubectl apply -f services/rc.yaml
 
 # Check the ReplicationController created
@@ -481,8 +481,152 @@ $ kubectl get pod --show-labels -o wide
 NAME            READY   STATUS    RESTARTS   AGE   IP          NODE                                            NOMINATED NODE   LABELS
 rc-sise-24vg4   1/1     Running   0          1m    10.12.1.9   gke-k8s-by-example-default-pool-5574bdde-dnnl   <none>           app=rc-sise
 rc-sise-dm4p8   1/1     Running   0          1m    10.12.2.8   gke-k8s-by-example-default-pool-5574bdde-gkhk   <none>           app=rc-sise
-
 ```
+
+Create the Service from `svc.yaml`:
+```sh
+$ kubectl apply -f services/svc.yaml
+service/simple-service created
+
+# Get the service
+$ kubectl get service -o wide
+NAME             TYPE        CLUSTER-IP      EXTERNAL-IP   PORT(S)   AGE   SELECTOR
+kubernetes       ClusterIP   10.15.240.1     <none>        443/TCP   3h    <none>
+simple-service   ClusterIP   10.15.255.188   <none>        80/TCP    29s   app=rc-sise
+
+# Get the pods
+$ kubectl get pods -l app=rc-sise -o wide
+NAME            READY   STATUS    RESTARTS   AGE   IP          NODE                                            NOMINATED NODE
+rc-sise-24vg4   1/1     Running   0          7m    10.12.1.9   gke-k8s-by-example-default-pool-5574bdde-dnnl   <none>
+rc-sise-dm4p8   1/1     Running   0          7m    10.12.2.8   gke-k8s-by-example-default-pool-5574bdde-gkhk   <none>
+
+# Describe one of the pods and grab one of their IPs
+$ kubectl describe pods rc-sise-24vg4 | grep IP
+IP:                 10.12.1.9
+
+# This can be accessed from one of three nodes running in the cluster
+Bensooraj@gke-k8s-by-example-default-pool-5574bdde-7k75 ~ $ curl 10.12.1.9:9876/info
+{"host": "10.12.1.9:9876", "version": "0.5.0", "from": "10.160.0.13"}
+```
+
+However, remember that pod IPs are ephemeral in nature and exist only as long as the pod exists. So, relying on pod IPs is not the right approach. 
+
+> The service keeps track of the pods it forwards traffic to through the label, in our case `app=sise`.
+
+Let's review the service that we created one more time:
+```sh
+$ kubectl get svc -o wide
+NAME             TYPE        CLUSTER-IP      EXTERNAL-IP   PORT(S)   AGE   SELECTOR
+kubernetes       ClusterIP   10.15.240.1     <none>        443/TCP   3h    <none>
+simple-service   ClusterIP   10.15.255.188   <none>        80/TCP    6m    app=rc-sise
+
+# Describe them
+$ kubectl describe svc simple-service
+Name:              simple-service
+Namespace:         default
+Labels:            <none>
+Annotations:       kubectl.kubernetes.io/last-applied-configuration:
+                     {"apiVersion":"v1","kind":"Service","metadata":{"annotations":{},"name":"simple-service","namespace":"default"},"spec":{"ports":[{"port":8...
+Selector:          app=rc-sise
+Type:              ClusterIP
+IP:                10.15.255.188
+Port:              <unset>  80/TCP
+TargetPort:        9876/TCP
+Endpoints:         10.12.1.9:9876,10.12.2.8:9876
+Session Affinity:  None
+Events:            <none>
+```
+
+Note that the `Endpoints` are actually pod IPs along with the port on which the application is running.
+
+```sh
+# The application can now be accessed using the clusterIP, from within the cluster
+Bensooraj@gke-k8s-by-example-default-pool-5574bdde-7k75 ~ $ curl 10.15.255.188/info
+{"host": "10.15.255.188", "version": "0.5.0", "from": "10.160.0.13"}
+```
+
+> [`IPtables`](https://wiki.centos.org/HowTos/Network/IPTables) makes the VIP `10.15.255.188` forward the traffic to the pods. `IPtables` is a long list of rules that tells the Linux kernel what to do with a certain IP package.
+
+Let's check them out:
+```sh
+# From within the cluster, that is from within a node(vm) running in the cluster
+Bensooraj@gke-k8s-by-example-default-pool-5574bdde-7k75 ~ $ sudo iptables-save | grep simple-service
+-A KUBE-SEP-XKHKNSMBAPANOQ3H -s 10.12.1.9/32 -m comment --comment "default/simple-service:" -j KUBE-MARK-MASQ
+-A KUBE-SEP-XKHKNSMBAPANOQ3H -p tcp -m comment --comment "default/simple-service:" -m tcp -j DNAT --to-destination 10.12.1.9:9876
+-A KUBE-SEP-XRG5PL6H4OXP3HUZ -s 10.12.2.8/32 -m comment --comment "default/simple-service:" -j KUBE-MARK-MASQ
+-A KUBE-SEP-XRG5PL6H4OXP3HUZ -p tcp -m comment --comment "default/simple-service:" -m tcp -j DNAT --to-destination 10.12.2.8:9876
+-A KUBE-SERVICES ! -s 10.12.0.0/14 -d 10.15.255.188/32 -p tcp -m comment --comment "default/simple-service: cluster IP" -m tcp --dport 80 -j KUBE-MARK-MASQ
+-A KUBE-SERVICES -d 10.15.255.188/32 -p tcp -m comment --comment "default/simple-service: cluster IP" -m tcp --dport 80 -j KUBE-SVC-LRSQWG6IZCA6IBBJ
+-A KUBE-SVC-LRSQWG6IZCA6IBBJ -m comment --comment "default/simple-service:" -m statistic --mode random --probability 0.50000000000 -j KUBE-SEP-XKHKNSMBAPANOQ3H
+-A KUBE-SVC-LRSQWG6IZCA6IBBJ -m comment --comment "default/simple-service:" -j KUBE-SEP-XRG5PL6H4OXP3HUZ
+```
+
+I have no clue how to read the above table, however, this is the `kube-proxy` defining rules to allow TCP connections back-n-forth the `ClusterIP` `10.15.255.188` and the pod IPs `10.12.1.9:9876` and `10.12.2.8:9876`.
+
+Let's scale up our `ReplicationController`:
+```sh
+$ kubectl scale replicationcontroller --replicas=3 rc-sise
+replicationcontroller/rc-sise scaled
+
+# Check the pods
+$ kubectl get pods --show-labels -o wide -w
+NAME            READY   STATUS    RESTARTS   AGE   IP           NODE                                            NOMINATED NODE   LABELS
+rc-sise-24vg4   1/1     Running   0          29m   10.12.1.9    gke-k8s-by-example-default-pool-5574bdde-dnnl   <none>           app=rc-sise
+rc-sise-dm4p8   1/1     Running   0          29m   10.12.2.8    gke-k8s-by-example-default-pool-5574bdde-gkhk   <none>           app=rc-sise
+rc-sise-p7sk9   1/1     Running   0          14s   10.12.1.10   gke-k8s-by-example-default-pool-5574bdde-dnnl   <none>           app=rc-sise
+```
+
+We have one more pod IP to handle, `10.12.1.10`.
+
+And guess what? The service `simple-service` has already updated itself to account for the 3rd pod added to the `ReplicationController`.
+```sh
+# Check the Endpoints key. All the 3 pod IPs are now handled by the service
+$ kubectl describe service simple-service 
+Name:              simple-service
+Namespace:         default
+Labels:            <none>
+Annotations:       kubectl.kubernetes.io/last-applied-configuration:
+                     {"apiVersion":"v1","kind":"Service","metadata":{"annotations":{},"name":"simple-service","namespace":"default"},"spec":{"ports":[{"port":8...
+Selector:          app=rc-sise
+Type:              ClusterIP
+IP:                10.15.255.188
+Port:              <unset>  80/TCP
+TargetPort:        9876/TCP
+Endpoints:         10.12.1.10:9876,10.12.1.9:9876,10.12.2.8:9876
+Session Affinity:  None
+Events:            <none>
+```
+
+Let's also checkout the `IPtables` as well from within the cluster:
+```sh
+Bensooraj@gke-k8s-by-example-default-pool-5574bdde-7k75 ~ $ sudo iptables-save | grep simple-service
+-A KUBE-SEP-O5OGXTSGDHX72GHE -s 10.12.1.10/32 -m comment --comment "default/simple-service:" -j KUBE-MARK-MASQ
+-A KUBE-SEP-O5OGXTSGDHX72GHE -p tcp -m comment --comment "default/simple-service:" -m tcp -j DNAT --to-destination 10.12.1.10:9876
+-A KUBE-SEP-XKHKNSMBAPANOQ3H -s 10.12.1.9/32 -m comment --comment "default/simple-service:" -j KUBE-MARK-MASQ
+-A KUBE-SEP-XKHKNSMBAPANOQ3H -p tcp -m comment --comment "default/simple-service:" -m tcp -j DNAT --to-destination 10.12.1.9:9876
+-A KUBE-SEP-XRG5PL6H4OXP3HUZ -s 10.12.2.8/32 -m comment --comment "default/simple-service:" -j KUBE-MARK-MASQ
+-A KUBE-SEP-XRG5PL6H4OXP3HUZ -p tcp -m comment --comment "default/simple-service:" -m tcp -j DNAT --to-destination 10.12.2.8:9876
+-A KUBE-SERVICES ! -s 10.12.0.0/14 -d 10.15.255.188/32 -p tcp -m comment --comment "default/simple-service: cluster IP" -m tcp --dport 80 -j KUBE-MARK-MASQ
+-A KUBE-SERVICES -d 10.15.255.188/32 -p tcp -m comment --comment "default/simple-service: cluster IP" -m tcp --dport 80 -j KUBE-SVC-LRSQWG6IZCA6IBBJ
+-A KUBE-SVC-LRSQWG6IZCA6IBBJ -m comment --comment "default/simple-service:" -m statistic --mode random --probability 0.33332999982 -j KUBE-SEP-O5OGXTSGDHX72GHE
+-A KUBE-SVC-LRSQWG6IZCA6IBBJ -m comment --comment "default/simple-service:" -m statistic --mode random --probability 0.50000000000 -j KUBE-SEP-XKHKNSMBAPANOQ3H
+-A KUBE-SVC-LRSQWG6IZCA6IBBJ -m comment --comment "default/simple-service:" -j KUBE-SEP-XRG5PL6H4OXP3HUZ
+```
+
+> ... the traffic to the service is equally split between the three pods by invoking the `statistics` module of `IPtables`.
+
+I think the `--probability` does that.
+
+Alrighty! Time to clean up:
+```sh
+$ kubectl delete replicationcontrollers rc-sise
+replicationcontroller "rc-sise" deleted
+
+$ kubectl delete svc simple-service
+service "simple-service" deleted
+```
+I think it makes more sense to delete the `Service` first and then the `ReplicationController`. I will do that next time.
+
 
 [1]: http://kubernetesbyexample.com
 [2]: https://github.com/openshift-evangelists/kbe
