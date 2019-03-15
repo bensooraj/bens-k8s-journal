@@ -2,6 +2,10 @@
 
 This is a journal of me walking through the entire [Kubernetes By Example][1] exercises on `Google Kubernetes Engine`. Here's their [GitHub repository][2].
 
+1. [Check config details](#check-config-details)
+2. [Spin-up a k8s cluster (GKE)](#spin-up-a-k8s-cluster-(gke))
+3. [Pods](#pods)
+
 ### Check config details
 ```sh
 # List the active accounts:
@@ -43,7 +47,9 @@ k8s-by-example  asia-south1-a  1.11.7-gke.4    35.200.190.186  n1-standard-1  1.
 
 Creating a GKE cluster using `gcloud` automatically makes an entry in the kubconfig file and also set the current context for `kubectl`.
 
+### Pods
 
+> A pod is a collection of containers sharing a network and mount namespace and is the basic unit of deployment in Kubernetes. All containers in a pod are scheduled on the same node.
 
 
 
