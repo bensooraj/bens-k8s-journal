@@ -5,6 +5,7 @@ This is a journal of me walking through the entire [Kubernetes By Example][1] ex
 1. [Check config details](#check-config-details)
 2. [Spin-up a k8s cluster (GKE)](#spin-up-a-k8s-cluster-(gke))
 3. [Pods](#pods)
+4. [Labels](#labels)
 
 ### Check config details
 ```sh
@@ -159,6 +160,49 @@ containers-constraint   1/1     Running   0          14m
 # Clean up
 $ kubectl delete pods containers-constraint
 pod "containers-constraint" deleted
+```
+
+### Labels
+
+> Labels are the mechanism you use to organize Kubernetes objects. A label is a key-value pair with certain restrictions concerning length and allowed values but without any pre-defined meaning.
+
+```sh
+# Create the pod using labels/labels-1.yaml
+$ kubectl create -f labels/labels-1.yaml
+pod/labelex created
+
+# Check the pods created
+$ kubectl get pods
+NAME      READY   STATUS             RESTARTS   AGE
+labelex   0/1     ImagePullBackOff   0          31s
+```
+
+Oops! Looks like I made some mistake while specifying the image for the container. Let me checkout what went wrong using the `describe` command:
+```sh
+$ $ kubectl describe pods labelex
+Name:               labelex
+Namespace:          default
+Priority:           0
+PriorityClassName:  <none>
+Node:               gke-k8s-by-example-default-pool-41076e94-4n53/10.160.0.12
+Start Time:         Fri, 15 Mar 2019 18:12:37 +0530
+Labels:             env=development
+Annotations:        <none>
+Status:             Pending
+IP:                 10.12.2.8
+.
+.
+.
+Events:
+  Type     Reason          Age                   From                                                    Message
+  ----     ------          ----                  ----                                                    -------
+  Normal   Scheduled       5m10s                 default-scheduler                                       Successfully assigned default/labelex to gke-k8s-by-example-default-pool-41076e94-4n53
+  Normal   SandboxChanged  5m1s (x2 over 5m3s)   kubelet, gke-k8s-by-example-default-pool-41076e94-4n53  Pod sandbox changed, it will be killed and re-created.
+  Normal   Pulling         4m10s (x3 over 5m9s)  kubelet, gke-k8s-by-example-default-pool-41076e94-4n53  pulling image "mhausenblas/simpleservice:0.5."
+  Warning  Failed          4m5s (x3 over 5m4s)   kubelet, gke-k8s-by-example-default-pool-41076e94-4n53  Failed to pull image "mhausenblas/simpleservice:0.5.": rpc error: code = Unknown desc = Error response from daemon: manifest for mhausenblas/simpleservice:0.5. not found
+  Warning  Failed          4m5s (x3 over 5m4s)   kubelet, gke-k8s-by-example-default-pool-41076e94-4n53  Error: ErrImagePull
+  Normal   BackOff         3m26s (x7 over 5m2s)  kubelet, gke-k8s-by-example-default-pool-41076e94-4n53  Back-off pulling image "mhausenblas/simpleservice:0.5."
+  Warning  Failed          3s (x19 over 5m2s)    kubelet, gke-k8s-by-example-default-pool-41076e94-4n53  Error: ImagePullBackOff
 ```
 
 [1]: http://kubernetesbyexample.com
