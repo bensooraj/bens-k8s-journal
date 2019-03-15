@@ -51,7 +51,112 @@ Creating a GKE cluster using `gcloud` automatically makes an entry in the kubcon
 
 > A pod is a collection of containers sharing a network and mount namespace and is the basic unit of deployment in Kubernetes. All containers in a pod are scheduled on the same node.
 
+A dry-run `kubectl run sise --image=mhausenblas/simpleservice:0.5.0 --port=9876 --dry-run=true -o yaml`, gives the following yaml output:
 
+```yaml
+apiVersion: apps/v1beta1
+kind: Deployment
+metadata:
+  creationTimestamp: null
+  labels:
+    run: sise
+  name: sise
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      run: sise
+  strategy: {}
+  template:
+    metadata:
+      creationTimestamp: null
+      labels:
+        run: sise
+    spec:
+      containers:
+      - image: mhausenblas/simpleservice:0.5.0
+        name: sise
+        ports:
+        - containerPort: 9876
+        resources: {}
+status: {}
+```
+
+Let's run the pod using the image `mhausenblas/simpleservice:0.5.0`:
+```sh
+$ kubectl run sise --image=mhausenblas/simpleservice:0.5.0 --port=9876
+kubectl run --generator=deployment/apps.v1beta1 is DEPRECATED and will be removed in a future version. Use kubectl create instead.
+deployment.apps/sise created
+
+# List out the pod
+$ kubectl get po -o wide
+NAME                   READY   STATUS    RESTARTS   AGE   IP          NODE                                            NOMINATED NODE
+sise-bf8d99689-qgkkk   1/1     Running   0          43s   10.12.1.6   gke-k8s-by-example-default-pool-f7f7edae-09cs   <none>
+
+# Grab the IP address
+$ kubectl describe pods sise-bf8d99689-qgkkk | grep IP
+IP:                 10.12.1.6
+
+# Get inside the pod and access the API using the IP address.
+# This is accessible from the cluster as well
+$ kubectl exec -it sise-bf8d99689-qgkkk sh
+> curl localhost:9876/info
+{"host": "localhost:9876", "version": "0.5.0", "from": "127.0.0.1"}# 
+
+> curl 10.12.1.6:9876/info
+{"host": "10.12.1.6:9876", "version": "0.5.0", "from": "10.12.1.6"}# 
+
+# List the deployments
+$ kubectl get deployments.
+NAME   DESIRED   CURRENT   UP-TO-DATE   AVAILABLE   AGE
+sise   1         1         1            1           20m
+
+# And delete it
+$ kubectl delete deployments sise
+deployment.extensions "sise" deleted
+```
+
+#### Using a configuration file
+```sh
+# Apply a configuration to a resource by filename or stdin. The resource name must be specified. This resource will be created if it doesn't exist yet. JSON and YAML formats are accepted.
+$ kubectl apply -f pod/pod.yaml
+pod/twocontainers created
+
+# List the pods
+$ kubectl get pods -o wide
+NAME            READY   STATUS    RESTARTS   AGE   IP          NODE                                            NOMINATED NODE
+twocontainers   2/2     Running   0          1m    10.12.1.7   gke-k8s-by-example-default-pool-f7f7edae-09cs   <none>
+
+# Get inside the container named 'shell' within the pod named 'twocontainers'
+$ kubectl exec -it twocontainers -c shell -- bash
+[root@twocontainers /]# curl localhost:9876/info
+{"host": "localhost:9876", "version": "0.5.0", "from": "127.0.0.1"}
+
+[root@twocontainers /]# curl 10.12.1.7:9876/info
+{"host": "10.12.1.7:9876", "version": "0.5.0", "from": "10.12.1.7"}
+
+# Clean up
+$ kubectl delete pods twocontainers
+pod "twocontainers" deleted
+```
+
+Creating pods with resource limits
+```sh
+# in the constraint-pod.yaml file:
+      resources:
+        limits:
+          memory: "64Mi" 
+          cpu: "500m"
+
+# List the pods
+$ kubectl get pods
+NAME                    READY   STATUS    RESTARTS   AGE
+containers-constraint   1/1     Running   0          14m
+
+# Clean up
+$ kubectl delete pods containers-constraint
+pod "containers-constraint" deleted
+```
 
 [1]: http://kubernetesbyexample.com
 [2]: https://github.com/openshift-evangelists/kbe
