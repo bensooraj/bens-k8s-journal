@@ -6,6 +6,7 @@ This is a journal of me walking through the entire [Kubernetes By Example][1] ex
 2. [Spin-up a k8s cluster (GKE)](#spin-up-a-k8s-cluster-(gke))
 3. [Pods](#pods)
 4. [Labels](#labels)
+5. [Deployments](#deployments)
 
 ### Check config details
 ```sh
@@ -292,6 +293,173 @@ $ kubectl get pods -w
 NAME       READY   STATUS        RESTARTS   AGE
 labelex    1/1     Terminating   0          61m
 labelex2   1/1     Terminating   0          6m34s
+```
+
+### Deployments
+
+> A deployment is a supervisor for pods, giving you fine-grained control over how and when a new pod version is rolled out as well as rolled back to a previous state.
+
+```sh
+# Create a deploment called sise-deploy using 
+$ kubectl apply -f deployments/deployment-1.yaml
+deployment.apps/sise-deployment created
+
+# The deployment has started creating the pods
+$ kubectl get pods
+NAME                               READY   STATUS              RESTARTS   AGE
+sise-deployment-6b9688f8f5-8xgr4   0/1     ContainerCreating   0          25s
+sise-deployment-6b9688f8f5-cwlvc   0/1     ContainerCreating   0          25s
+
+# After a while
+$ kubectl get pods
+NAME                               READY   STATUS    RESTARTS   AGE
+sise-deployment-6b9688f8f5-8xgr4   1/1     Running   0          63s
+sise-deployment-6b9688f8f5-cwlvc   1/1     Running   0          63s
+
+# Check the deployment as well
+$ kubectl get deployments -o wide
+NAME              DESIRED   CURRENT   UP-TO-DATE   AVAILABLE   AGE   CONTAINERS   IMAGES                            SELECTOR
+sise-deployment   2         2         2            2           3m    sise         mhausenblas/simpleservice:0.5.0   app=sise
+
+# List out the replica sets 
+$ kubectl get rs -o wide
+NAME                         DESIRED   CURRENT   READY   AGE   CONTAINERS   IMAGES                            SELECTOR
+sise-deployment-6b9688f8f5   2         2         2       4m    sise         mhausenblas/simpleservice:0.5.0   app=sise,pod-template-hash=2652449491
+```
+> Note the naming of the pods and replica set, derived from the deployment name.
+
+Check the app using the pod IPs
+```sh
+# Get the pod IPs
+$ kubectl describe pod sise-deployment-6b9688f8f5-8xgr4 | grep IP
+IP:                 10.12.1.6
+
+$ kubectl describe pod sise-deployment-6b9688f8f5-cwlvc | grep IP
+IP:                 10.12.2.5
+```
+
+SSH into one of the nodes of the cluster: 
+* Navigate to `GCE > Compute Engine > VM instances`. Select one of the nodes
+* Under the `Connect` (against any one of the nodes), click on the `SSH` drop-down and select `View gcloud command` as shown below:
+![Deployment 1](images/deploy-1.png)
+* You will be presented with a command similar to: `gcloud compute --project "kubernetes-practice-219913" ssh --zone "asia-south1-a" "gke-k8s-by-example-default-pool-5574bdde-7k75"`
+
+```sh
+# From within the cluster, access the app running inside the pods
+Bensooraj@gke-k8s-by-example-default-pool-5574bdde-7k75 ~ $ curl 10.12.1.6:9876/info
+{"host": "10.12.1.6:9876", "version": "0.9", "from": "10.160.0.13"}
+
+Bensooraj@gke-k8s-by-example-default-pool-5574bdde-7k75 ~ $ curl 10.12.2.5:9876/info
+{"host": "10.12.2.5:9876", "version": "0.9", "from": "10.160.0.13"}
+```
+
+Rolling out an update
+```sh
+# Update the value of the environment variable SIMPLE_SERVICE_VERSION from "0.9" to "1.0"
+$ kubectl apply -f deployments/deployment-2.yaml
+deployment.apps/sise-deployment configured
+
+# You can see the roll-out happening
+$ kubectl get pods -w
+NAME                               READY   STATUS        RESTARTS   AGE
+sise-deployment-6b9688f8f5-8xgr4   1/1     Terminating   0          41m
+sise-deployment-6b9688f8f5-cwlvc   1/1     Terminating   0          41m
+sise-deployment-6c7b7f88c5-8mwr2   1/1     Running       0          16s
+sise-deployment-6c7b7f88c5-zxfgm   1/1     Running       0          18s
+
+# After a while
+$ kubectl get pods
+NAME                               READY   STATUS    RESTARTS   AGE
+sise-deployment-6c7b7f88c5-8mwr2   1/1     Running   0          2m
+sise-deployment-6c7b7f88c5-zxfgm   1/1     Running   0          2m
+
+# Check out the replication set as well. A new replication set will be created
+$ kubectl get rs -w
+NAME                         DESIRED   CURRENT   READY   AGE
+sise-deployment-6b9688f8f5   0         0         0       42m
+sise-deployment-6c7b7f88c5   2         2         2       57s
+
+# Check out the roll-out status
+$ kubectl rollout status deployment sise-deployment
+deployment "sise-deployment" successfully rolled out
+```
+Remember, the value change can also be rolled out using the command: `kubectl edit deploy sise-deployment`.
+
+
+Verify the change made to the value of the environment variable by pinging the app
+```sh
+# Get the new set of pod IPs
+j$ kubectl describe pods sise-deployment-6c7b7f88c5-8mwr2 | grep IP
+IP:                 10.12.2.6
+
+$ kubectl describe pods sise-deployment-6c7b7f88c5-zxfgm | grep IP
+IP:                 10.12.1.7
+
+# Curl the IPs from the node we SSHed into above
+Bensooraj@gke-k8s-by-example-default-pool-5574bdde-7k75 ~ $ curl 10.12.2.6:9876/info
+{"host": "10.12.2.6:9876", "version": "1.0", "from": "10.160.0.13"}
+
+Bensooraj@gke-k8s-by-example-default-pool-5574bdde-7k75 ~ $ curl 10.12.1.7:9876/info
+{"host": "10.12.1.7:9876", "version": "1.0", "from": "10.160.0.13"}
+```
+
+Undo the roll-out
+```sh
+# Check-out the roll-out history
+$ kubectl rollout history deployment sise-deployment
+deployment.extensions/sise-deployment 
+REVISION  CHANGE-CAUSE
+1         <none>
+2         <none>
+
+# Undo the roll-out
+$ kubectl rollout undo deployment sise-deployment 
+deployment.extensions/sise-deployment
+
+# The roll-back has begun
+$ kubectl get pods -o wide -w
+NAME                               READY   STATUS        RESTARTS   AGE   IP          NODE                                            NOMINATED NODE
+sise-deployment-6b9688f8f5-74fnz   1/1     Running       0          8s    10.12.2.7   gke-k8s-by-example-default-pool-5574bdde-gkhk   <none>
+sise-deployment-6b9688f8f5-gglnk   1/1     Running       0          10s   10.12.1.8   gke-k8s-by-example-default-pool-5574bdde-dnnl   <none>
+sise-deployment-6c7b7f88c5-8mwr2   1/1     Terminating   0          13m   10.12.2.6   gke-k8s-by-example-default-pool-5574bdde-gkhk   <none>
+sise-deployment-6c7b7f88c5-zxfgm   1/1     Terminating   0          13m   10.12.1.7   gke-k8s-by-example-default-pool-5574bdde-dnnl   <none>
+
+# List the roll-out history one more time
+$ kubectl rollout history deployment sise-deployment
+deployment.extensions/sise-deployment 
+REVISION  CHANGE-CAUSE
+2         <none>
+3         <none>
+
+# Get the new IP addresses
+$ kubectl describe pods sise-deployment-6b9688f8f5-74fnz | grep IP
+IP:                 10.12.2.7
+
+$ kubectl describe pods sise-deployment-6b9688f8f5-gglnk | grep IP
+IP:                 10.12.1.8
+
+# Ping the app again from withing the cluster
+Bensooraj@gke-k8s-by-example-default-pool-5574bdde-7k75 ~ $ curl 10.12.2.7:9876/info
+{"host": "10.12.2.7:9876", "version": "0.9", "from": "10.160.0.13"}
+
+Bensooraj@gke-k8s-by-example-default-pool-5574bdde-7k75 ~ $ curl 10.12.1.8:9876/info
+{"host": "10.12.1.8:9876", "version": "0.9", "from": "10.160.0.13"}
+```
+
+You can see the version rolled-back from `"version": "1.0"` to `"version": "0.9"`.
+
+Also, you can explicitly roll back to a specific revision using the flag `--to-revision`. For example: `kubectl rollout undo deployment sise-deployment`
+
+Time to clean up!
+```sh
+$ kubectl delete deployment sise-deployment
+deployment.extensions "sise-deployment" deleted
+
+# Pods going down! :P
+$ kubectl get pods -w
+NAME                               READY   STATUS        RESTARTS   AGE
+sise-deployment-6b9688f8f5-74fnz   1/1     Terminating   0          6m27s
+sise-deployment-6b9688f8f5-gglnk   1/1     Terminating   0          6m29s
 ```
 
 [1]: http://kubernetesbyexample.com
