@@ -718,7 +718,83 @@ The `FQDN` `thesvc.default.svc.cluster.local` works only from within another `po
 
 > To access a service that is deployed in a different namespace than the one you’re accessing it from, use a `FQDN` in the form `$SVC.$NAMESPACE.svc.cluster.local`.
 
+Let's attempt connecting to a service running in a different namespace
+```sh
+# Create a new namespace `other`
+$ kubectl apply -f service-discovery/other-ns.yaml
+namespace/other created
 
+# Let's list the namespaces
+$ kubectl get namespaces
+NAME          STATUS   AGE
+default       Active   3h
+kube-public   Active   3h
+kube-system   Active   3h
+other         Active   7s
+
+# Create a ReplicationController in the namespace `other`
+$ kubectl apply -f service-discovery/other-rc.yaml
+
+# List all pods across all namespaces
+$ kubectl get pods --all-namespaces
+NAMESPACE     NAME                                                       READY   STATUS    RESTARTS   AGE
+default       jumppod                                                    1/1     Running   0          42m
+default       rcsise-mgdc8                                               1/1     Running   0          1h
+default       rcsise-rwqxt                                               1/1     Running   0          1h
+.
+.
+.
+other         other-rc-stk98                                             1/1     Running   0          4m
+
+# Create the service in the namespace `other`
+$ kubectl apply -f service-discovery/other-svc.yaml
+service/other-sise-service created
+
+# List all services across all namespaces
+$ kubectl get svc --all-namespaces
+NAMESPACE     NAME                   TYPE        CLUSTER-IP      EXTERNAL-IP   PORT(S)         AGE
+default       kubernetes             ClusterIP   10.15.240.1     <none>        443/TCP         4h
+default       thesvc                 ClusterIP   10.15.241.194   <none>        80/TCP          1h
+.
+.
+.
+other         other-sise-service     ClusterIP   10.15.245.253   <none>        80/TCP          3s
+```
+
+Get inside the `jumppod` and access the service running in the namespace `other`:
+```sh
+$ kubectl exec -it jumppod sh
+
+# Ping using the FQDN
+sh-4.2# curl other-sise-service.other.svc.cluster.local/info
+{"host": "other-sise-service.other.svc.cluster.local", "version": "0.5.0", "from": "10.12.2.7"}
+
+# And the shorter version as well
+sh-4.2# curl other-sise-service.other/info
+{"host": "other-sise-service.other", "version": "0.5.0", "from": "10.12.2.7"}
+```
+
+> Summing up, DNS-based service discovery provides a flexible and generic way to connect to services across the cluster.
+
+Clean up time!
+```sh
+# Bring down the resources in the namespace `other`
+$ kubectl --namespace=other delete svc other-sise-service
+service "other-sise-service" deleted
+
+$ kubectl --namespace=other delete rc other-rc
+replicationcontroller "other-rc" deleted
+
+# And in the namespace `default`
+$ kubectl delete svc thesvc
+service "thesvc" deleted
+
+$ kubectl delete rc rcsise
+replicationcontroller "rcsise" deleted
+
+$ kubectl delete pod jumppod
+pod "jumppod" deleted
+```
 
 [1]: http://kubernetesbyexample.com
 [2]: https://github.com/openshift-evangelists/kbe

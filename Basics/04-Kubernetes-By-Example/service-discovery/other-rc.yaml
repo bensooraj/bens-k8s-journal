@@ -1,0 +1,20 @@
+apiVersion: v1
+kind: ReplicationController
+metadata:
+  name: other-rc
+  namespace: other
+spec:
+  replicas: 1
+  selector:
+    app: other-sise
+  template:
+    metadata:
+      name: other-somename
+      labels:
+        app: other-sise
+    spec:
+      containers:
+        - name: other-sise
+          image: mhausenblas/simpleservice:0.5.0
+          ports:
+            - containerPort: 9876
