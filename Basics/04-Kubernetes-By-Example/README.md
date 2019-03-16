@@ -9,6 +9,7 @@ This is a journal of me walking through the entire [Kubernetes By Example][1] ex
 5. [Deployments](#deployments)
 6. [Services](#services)
 7. [Service Discovery](#service-discovery)
+8. [Port Forward](#port-forward)
 
 ### Check config details
 ```sh
@@ -794,6 +795,65 @@ replicationcontroller "rcsise" deleted
 
 $ kubectl delete pod jumppod
 pod "jumppod" deleted
+```
+
+### Port Forward
+
+> In the context of developing apps on Kubernetes it is often useful to quickly access a service from your local environment without exposing it using, for example, a load balancer or an ingress resource. In this case you can use [port forwarding](https://kubernetes.io/docs/tasks/access-application-cluster/port-forward-access-application-cluster/).
+
+```sh
+# Created a Deployment and a corresponding Service using port-forward/port-forward-1.yaml
+$ kubectl create -f port-forward/port-forward-1.yaml 
+deployment.apps/sise-deploy created
+service/simpleservice created
+
+# List the deployment
+$ kubectl get deployment -o wide
+NAME          DESIRED   CURRENT   UP-TO-DATE   AVAILABLE   AGE   CONTAINERS   IMAGES                            SELECTOR
+sise-deploy   1         1         1            1           1m    sise         mhausenblas/simpleservice:0.5.0   app=sise
+
+# And the service
+$ kubectl get service -o wide
+NAME            TYPE        CLUSTER-IP     EXTERNAL-IP   PORT(S)   AGE   SELECTOR
+kubernetes      ClusterIP   10.15.240.1    <none>        443/TCP   13h   <none>
+simpleservice   ClusterIP   10.15.244.55   <none>        80/TCP    1m    app=sise
+```
+
+The application running in GKE is either accessible from the pods or from any node of the cluster. We want to access the service from our local machine as well for development.
+```sh
+# Fetch the pod IP
+$ kubectl describe pods sise-deploy-56955c466c-dz99x | grep IP
+IP:                 10.12.2.9
+
+
+# From the local machine, let's curl the pod's IP
+$ curl 10.12.2.9:9876/info
+
+# Or the ClusteIP created by the service
+$ curl 10.15.244.55/info
+```
+
+They return nothing. Let's do a `port-forward` now.
+```sh
+# To access the `simpleservice` service from the local environment on port 8080
+$ kubectl port-forward service/simpleservice 8080:80
+Forwarding from 127.0.0.1:8080 -> 9876
+Forwarding from [::1]:8080 -> 9876
+
+# Curl localhost:8080
+$ curl localhost:8080/info
+{"host": "localhost:8080", "version": "0.5.0", "from": "127.0.0.1"}
+
+# Perfecto!
+```
+
+> **Remember that port forwarding is not meant for production traffic but for development and experimentation.**
+
+Clean up!
+```sh
+$ kubectl delete -f port-forward/port-forward-1.yaml
+deployment.apps "sise-deploy" deleted
+service "simpleservice" deleted
 ```
 
 [1]: http://kubernetesbyexample.com
