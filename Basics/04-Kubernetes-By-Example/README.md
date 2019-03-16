@@ -654,5 +654,71 @@ kubernetes   ClusterIP   10.15.240.1     <none>        443/TCP   159m   <none>
 thesvc       ClusterIP   10.15.241.194   <none>        80/TCP    11s    app=sise
 ```
 
+I will now create a **jump pod** in the `default` namespace and try to simulate connecting to the `thesvc` service from within the cluster, say, from another service.
+
+```sh
+# Create the jump pod
+$ kubectl apply -f service-discovery/jumppod.yaml
+pod/jumppod created
+
+# List the pods created
+$ kubectl get pods -o wide
+NAME           READY   STATUS    RESTARTS   AGE   IP          NODE                                            NOMINATED NODE
+jumppod        1/1     Running   0          1m    10.12.2.7   gke-k8s-by-example-default-pool-dec3a359-jsgl   <none>
+rcsise-mgdc8   1/1     Running   0          31m   10.12.2.6   gke-k8s-by-example-default-pool-dec3a359-jsgl   <none>
+rcsise-rwqxt   1/1     Running   0          31m   10.12.1.5   gke-k8s-by-example-default-pool-dec3a359-wrxk   <none>
+```
+
+> The DNS add-on will make sure that our service `thesvc` is available via the FQDN `thesvc.default.svc.cluster.local` from other pods in the cluster. 
+
+```sh
+# Get inside the pod `jumppod`
+$ kubectl exec -it jumppod sh
+
+# From within jumppod, ping thesvc.default.svc.cluster.local
+sh-4.2# ping thesvc.default.svc.cluster.local
+PING thesvc.default.svc.cluster.local (10.15.241.194) 56(84) bytes of data.
+^C
+--- thesvc.default.svc.cluster.local ping statistics ---
+23 packets transmitted, 0 received, 100% packet loss, time 22522ms
+```
+
+The `ping` results in *100% packet loss*, probably, because  `ping` is not enable on the application image. However, you can see that the `thesvc.default.svc.cluster.local` translating to the `ClusterIP` `10.15.241.194`.
+
+Let ping the application using the `FQDN`, from withing the jumppod:
+```sh
+# Using the FQDN
+sh-4.2# curl thesvc.default.svc.cluster.local/info
+{"host": "thesvc.default.svc.cluster.local", "version": "0.5.0", "from": "10.12.2.7"}
+
+# Using the name of the service `thesvc`
+sh-4.2# curl thesvc/info
+{"host": "thesvc", "version": "0.5.0", "from": "10.12.2.7"}
+
+# Or
+sh-4.2# curl http://thesvc/info
+{"host": "thesvc", "version": "0.5.0", "from": "10.12.2.7"}
+```
+
+Now, let's try to reach the application from within one of the nodes in the cluster
+```sh
+Bensooraj@gke-k8s-by-example-default-pool-dec3a359-jsgl ~ $ curl thesvc.default.svc.cluster.local/info
+# curl: (6) Couldn't resolve host 'thesvc.default.svc.cluster.local'
+
+Bensooraj@gke-k8s-by-example-default-pool-dec3a359-jsgl ~ $ curl thesvc/info
+# curl: (6) Couldn't resolve host 'thesvc'
+Bensooraj@gke-k8s-by-example-default-pool-dec3a359-jsgl ~ $ curl http://thesvc/info
+# curl: (6) Couldn't resolve host 'thesvc'
+
+Bensooraj@gke-k8s-by-example-default-pool-dec3a359-jsgl ~ $ curl 10.15.241.194/info
+# {"host": "10.15.241.194", "version": "0.5.0", "from": "10.160.0.18"}
+```
+
+The `FQDN` `thesvc.default.svc.cluster.local` works only from within another `pod` in the same `namespace`, unlike the `ClusterIP`.
+
+> To access a service that is deployed in a different namespace than the one you’re accessing it from, use a `FQDN` in the form `$SVC.$NAMESPACE.svc.cluster.local`.
+
+
+
 [1]: http://kubernetesbyexample.com
 [2]: https://github.com/openshift-evangelists/kbe
