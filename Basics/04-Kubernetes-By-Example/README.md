@@ -8,6 +8,7 @@ This is a journal of me walking through the entire [Kubernetes By Example][1] ex
 4. [Labels](#labels)
 5. [Deployments](#deployments)
 6. [Services](#services)
+7. [Service Discovery](#service-discovery)
 
 ### Check config details
 ```sh
@@ -627,6 +628,31 @@ service "simple-service" deleted
 ```
 I think it makes more sense to delete the `Service` first and then the `ReplicationController`. I will do that next time.
 
+### Service Discovery
+
+> Service discovery is the process of figuring out how to connect to a service. While there is a service discovery option based on environment variables available, the DNS-based service discovery is preferable. Note that DNS is a cluster add-on so make sure your Kubernetes distribution provides for one or install it yourself.
+
+```sh
+# Create the RC from service-discovery/rc.yaml
+$ kubectl apply -f service-discovery/rc.yaml
+replicationcontroller/rcsise created
+
+# Check the pods
+$ kubectl get pods -o wide 
+NAME           READY   STATUS    RESTARTS   AGE   IP          NODE                                            NOMINATED NODE
+rcsise-mgdc8   1/1     Running   0          56s   10.12.2.6   gke-k8s-by-example-default-pool-dec3a359-jsgl   <none>
+rcsise-rwqxt   1/1     Running   0          56s   10.12.1.5   gke-k8s-by-example-default-pool-dec3a359-wrxk   <none>
+
+# Create the service as well using service-discovery/svc.yaml
+$ kubectl apply -f service-discovery/svc.yaml
+service/thesvc created
+
+# Check the service that we just created
+$ kubectl get svc -o wide -w
+NAME         TYPE        CLUSTER-IP      EXTERNAL-IP   PORT(S)   AGE    SELECTOR
+kubernetes   ClusterIP   10.15.240.1     <none>        443/TCP   159m   <none>
+thesvc       ClusterIP   10.15.241.194   <none>        80/TCP    11s    app=sise
+```
 
 [1]: http://kubernetesbyexample.com
 [2]: https://github.com/openshift-evangelists/kbe
