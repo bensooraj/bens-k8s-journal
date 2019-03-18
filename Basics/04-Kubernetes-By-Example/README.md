@@ -10,6 +10,7 @@ This is a journal of me walking through the entire [Kubernetes By Example][1] ex
 6. [Services](#services)
 7. [Service Discovery](#service-discovery)
 8. [Port Forward](#port-forward)
+9. [Health Checks](#health-checks)
 
 ### Check config details
 ```sh
@@ -855,6 +856,90 @@ $ kubectl delete -f port-forward/port-forward-1.yaml
 deployment.apps "sise-deploy" deleted
 service "simpleservice" deleted
 ```
+
+### Health Checks
+
+> In order to verify if a container in a pod is healthy and ready to serve traffic, Kubernetes provides for a range of health checking mechanisms. Health checks, or probes as they are called in Kubernetes, are carried out by the `kubelet` to determine when to restart a container (for `livenessProbe`) and used by services and deployments to determine if a pod should receive traffic (for `readinessProbe`).
+
+```sh
+# Pod which exposes /health for liveness health check. Kubernetes will start checking the /health endpoint, after initially waiting 2 seconds, every 5 seconds.
+$ kubectl apply -f health-checks/liveness-pod.yaml
+pod/readiness-pod created
+
+# List the pod
+$ kubectl get pods -o wide
+NAME            READY   STATUS    RESTARTS   AGE   IP          NODE                                            NOMINATED NODE
+readiness-pod   1/1     Running   0          1m    10.12.1.6   gke-k8s-by-example-default-pool-85e67e86-2xlh   <none>
+
+# Describe the pod
+$ kubectl describe pods readiness-pod
+```
+
+Relevant excerpt from `kubectl describe pods readiness-pod`:
+
+![Health 1](images/health-1.png)
+
+Let's launch a bad/unhealthy pod now, that has a container that randomly (in the time range 1 to 4 sec) does not return a 200 code.
+```sh
+# Launch the bad pod
+$ kubectl apply -f health-checks/bad-pod.yaml
+pod/bad-pod created
+
+# List out the pods; look at the number of restarts!
+$ kubectl get pods -o wide
+NAME            READY   STATUS    RESTARTS   AGE   IP          NODE                                            NOMINATED NODE
+bad-pod         1/1     Running   4          4m    10.12.0.5   gke-k8s-by-example-default-pool-85e67e86-qbpv   <none>
+readiness-pod   1/1     Running   0          17m   10.12.1.6   gke-k8s-by-example-default-pool-85e67e86-2xlh   <none>
+
+# Logging out the bad-pod
+$ kubectl logs -f bad-pod
+# 2019-03-18T06:38:49 INFO This is simple service in version v0.5.0 listening on port 9876 [at line 142]
+# 2019-03-18T06:38:52 INFO /health serving from 10.12.0.5:9876 has been invoked from 10.12.0.1 [at line 79]
+# 2019-03-18T06:38:55 INFO 200 GET /health (10.12.0.1) 3277.99ms [at line 1946]
+# 2019-03-18T06:38:57 INFO /health serving from 10.12.0.5:9876 has been invoked from 10.12.0.1 [at line 79]
+# 2019-03-18T06:39:00 INFO 200 GET /health (10.12.0.1) 3540.73ms [at line 1946]
+# 2019-03-18T06:39:02 INFO /health serving from 10.12.0.5:9876 has been invoked from 10.12.0.1 [at line 79]
+# 2019-03-18T06:39:06 INFO 200 GET /health (10.12.0.1) 3778.49ms [at line 1946]
+# ..
+# ..
+
+# Print out the events as well
+$ kubectl describe pods bad-pod
+```
+Relevant excerpt from printing out the `bad-pod` events:
+
+![Health 2](images/health-2.png)
+
+Let’s create a pod with a `readinessProbe` that signals when the container is ready to serve traffica and kicks in after 10 seconds:
+```sh
+# Create the pod
+$ kubectl apply -f health-checks/readiness-pod.yaml 
+pod/readiness-pod-1 created
+
+# List the pods now
+$ kubectl get pods -o wide
+NAME              READY   STATUS             RESTARTS   AGE   IP          NODE                                            NOMINATED NODE
+bad-pod           0/1     CrashLoopBackOff   11         27m   10.12.0.5   gke-k8s-by-example-default-pool-85e67e86-qbpv   <none>
+readiness-pod     1/1     Running            0          40m   10.12.1.6   gke-k8s-by-example-default-pool-85e67e86-2xlh   <none>
+readiness-pod-1   1/1     Running            0          1m    10.12.1.7   gke-k8s-by-example-default-pool-85e67e86-2xlh   <none>
+
+# Describe the pods events
+$ kubectl describe pods readiness-pod-1
+```
+
+Relevant excerpt from printing out the `readiness-pod-1` events:
+
+![Health 3](images/health-3.png)
+
+Clean up time:
+```sh
+$ kubectl delete pods --all
+pod "bad-pod" deleted
+pod "readiness-pod" deleted
+pod "readiness-pod-1" deleted
+```
+
+I just realised; I messed up the pod names. Sorry!
 
 [1]: http://kubernetesbyexample.com
 [2]: https://github.com/openshift-evangelists/kbe
