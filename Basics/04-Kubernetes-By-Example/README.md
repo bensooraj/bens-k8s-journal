@@ -11,6 +11,7 @@ This is a journal of me walking through the entire [Kubernetes By Example][1] ex
 7. [Service Discovery](#service-discovery)
 8. [Port Forward](#port-forward)
 9. [Health Checks](#health-checks)
+10. [Environment Variables](#environment-variables)
 
 ### Check config details
 ```sh
@@ -940,6 +941,62 @@ pod "readiness-pod-1" deleted
 ```
 
 I just realised; I messed up the pod names. Sorry!
+
+### Environment Variables
+
+> You can set environment variables for containers running in a pod and in addition, Kubernetes exposes certain runtime infos via environment variables automatically.
+
+Launch a pod with the environment variable `SIMPLE_SERVICE_VERSION` and value `"1.0"`:
+```sh
+# Use environment-variables/env-pod.yaml
+$ kubectl apply -f environment-variables/env-pod.yaml
+pod/envs created
+
+# List the pods
+$ kubectl get pods -o wide
+NAME   READY   STATUS    RESTARTS   AGE   IP          NODE                                            NOMINATED NODE
+envs   1/1     Running   0          2m    10.12.2.6   gke-k8s-by-example-default-pool-6c270685-0hd5   <none>
+
+# Grab the IP address:
+$ kubectl describe pod envs | grep IP
+IP:                 10.12.2.6
+
+# Curl the pod IP from inside the cluster
+[CLUSTER] $ curl 10.12.2.6:9876/info && echo
+{"host": "10.12.2.6:9876", "version": "1.0", "from": "10.12.2.1"}
+
+[CLUSTER] $ curl 10.12.2.6:9876/env && echo
+{"version": "1.0", "env": "{'LANG': 'C.UTF-8', 'KUBERNETES_PORT_443_TCP_PROTO': 'tcp', 'KUBERNETES_PORT_443_TCP': 'tcp://10.15.240.1:443', 'SIMPLE_SERVICE_VERSION': '1.0', 'PYTHON_PIP_VERSION': '9.0.1', 'KUBERNETES_SERVICE_HOST': '10.15.240.1', 'HOSTNAME': 'envs', 'KUBERNETES_SERVICE_PORT_HTTPS': '443', 'REFRESHED_AT': '2017-04-24T13:50', 'GPG_KEY': 'C01E1CAD5EA2C4F0B8E3571504C367C218ADD4FF', 'KUBERNETES_PORT_443_TCP_ADDR': '10.15.240.1', 'KUBERNETES_PORT': 'tcp://10.15.240.1:443', 'PATH': '/usr/local/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin', 'KUBERNETES_PORT_443_TCP_PORT': '443', 'HOME': '/root', 'KUBERNETES_SERVICE_PORT': '443', 'PYTHON_VERSION': '2.7.13'}"}
+```
+
+Or, `exec` into the `envs` pod and printout the variables:
+```sh
+$ kubectl exec envs -- sh -c 'env'
+KUBERNETES_SERVICE_PORT=443
+KUBERNETES_PORT=tcp://10.15.240.1:443
+HOSTNAME=envs
+PYTHON_PIP_VERSION=9.0.1
+HOME=/root
+GPG_KEY=C01E1CAD5EA2C4F0B8E3571504C367C218ADD4FF
+SIMPLE_SERVICE_VERSION=1.0
+KUBERNETES_PORT_443_TCP_ADDR=10.15.240.1
+PATH=/usr/local/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
+KUBERNETES_PORT_443_TCP_PORT=443
+KUBERNETES_PORT_443_TCP_PROTO=tcp
+LANG=C.UTF-8
+PYTHON_VERSION=2.7.13
+KUBERNETES_SERVICE_PORT_HTTPS=443
+KUBERNETES_PORT_443_TCP=tcp://10.15.240.1:443
+KUBERNETES_SERVICE_HOST=10.15.240.1
+PWD=/usr/src/app
+REFRESHED_AT=2017-04-24T13:50
+```
+
+Clean up time:
+```sh
+$ kubectl delete pods --all
+pod "envs" deleted
+```
 
 [1]: http://kubernetesbyexample.com
 [2]: https://github.com/openshift-evangelists/kbe
