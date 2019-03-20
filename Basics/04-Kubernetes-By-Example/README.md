@@ -12,6 +12,7 @@ This is a journal of me walking through the entire [Kubernetes By Example][1] ex
 8. [Port Forward](#port-forward)
 9. [Health Checks](#health-checks)
 10. [Environment Variables](#environment-variables)
+11. [Namespaces](#namespaces)
 
 ### Check config details
 ```sh
@@ -997,6 +998,72 @@ Clean up time:
 $ kubectl delete pods --all
 pod "envs" deleted
 ```
+
+### Namespaces
+
+> `Namespaces` provide for a scope of Kubernetes resource, carving up your cluster in smaller units. You can think of it as a workspace you’re sharing with other users.
+
+```sh
+# Create a namespace named ben-test-namespace
+$ kubectl apply -f namespaces/ns.yaml
+namespace/ben-test-namespace created
+
+# List all the namespaces
+$ kubectl get ns
+NAME                 STATUS   AGE
+ben-test-namespace   Active   14s
+default              Active   4h
+kube-public          Active   4h
+kube-system          Active   4h
+
+# Know more about the namespace
+$ kubectl describe ns ben-test-namespace
+Name:         ben-test-namespace
+Labels:       <none>
+Annotations:  kubectl.kubernetes.io/last-applied-configuration:
+                {"apiVersion":"v1","kind":"Namespace","metadata":{"annotations":{},"name":"ben-test-namespace"}}
+Status:       Active
+
+Resource Quotas
+ Name:                       gke-resource-quotas
+ Resource                    Used  Hard
+ --------                    ---   ---
+ count/ingresses.extensions  0     1G
+ count/jobs.batch            0     1G
+ pods                        0     1G
+ services                    0     1G
+
+No resource limits.
+```
+
+Launching k8s resources/objects in the newly created namespaces
+```sh
+# There are two ways you can accomplishe this,
+# First, using kubectl's "namespace' flag
+$ kubectl --namespace=ben-test-namespace apply -f namespaces/pod.yaml
+pod/pod-in-ben-test-namespace created
+
+# By mentioning the namespace in the pod yaml file, under
+# {metadata.namespace}
+apiVersion: v1
+kind: Pod
+metadata:
+  name: pod-in-ben-test-namespace
+  namespace: ben-test-namespace
+spec:
+```
+
+Clean up time!
+```sh
+# Pod in the newly created namespace
+$ kubectl --namespace=ben-test-namespace delete pod pod-in-ben-test-namespace
+pod "pod-in-ben-test-namespace" deleted
+
+# Then the newly created namespace
+$ kubectl delete namespaces ben-test-namespace
+namespace "ben-test-namespace" deleted
+```
+
 
 [1]: http://kubernetesbyexample.com
 [2]: https://github.com/openshift-evangelists/kbe
