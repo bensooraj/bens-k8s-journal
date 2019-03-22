@@ -13,6 +13,7 @@ This is a journal of me walking through the entire [Kubernetes By Example][1] ex
 9. [Health Checks](#health-checks)
 10. [Environment Variables](#environment-variables)
 11. [Namespaces](#namespaces)
+12. [Volumes](#volumes)
 
 ### Check config details
 ```sh
@@ -1064,6 +1065,83 @@ $ kubectl delete namespaces ben-test-namespace
 namespace "ben-test-namespace" deleted
 ```
 
+### Volumes
 
+> A Kubernetes volume is essentially a directory accessible to all containers running in a pod. In contrast to the container-local filesystem, the data in volumes is preserved across container restarts. 
+
+The medium backing a volume and its contents are determined by the volume type:
+
+* node-local types such as `emptyDir` or `hostPath`
+* file-sharing types such as `nfs`
+* cloud provider-specific types like `awsElasticBlockStore`, `azureDisk`, or `gcePersistentDisk`
+* distributed file system types, for example `glusterfs` or `cephfs`
+* special-purpose types like `secret`, `gitRepo`
+
+```sh
+# Create the pod with the two containers
+$ kubectl apply -f volumes/pod.yaml
+pod/sharevol created
+
+# List the pods
+$ kubectl get pods -o wide
+NAME       READY   STATUS    RESTARTS   AGE   IP          NODE                                            NOMINATED NODE
+sharevol   2/2     Running   0          48s   10.12.1.8   gke-k8s-by-example-default-pool-200a36e7-c33r   <none>
+
+# Describe the pod (showing only relevant excerpts)
+$ kubectl describe pod sharevol
+Name:               sharevol
+Namespace:          default
+IP:                 10.12.1.8
+Containers:
+  c1:
+    Image:         centos:7
+    Mounts:
+      /tmp/xchange from xchange (rw)
+  c2:
+    Image:         centos:7
+    Mounts:
+      /temp/data from xchange (rw)
+.
+.
+Volumes:
+  xchange:
+    Type:    EmptyDir (a temporary directory that shares a pod's lifetime)
+    Medium:
+```
+
+Let's get inside the containers `c1` and `c2` and play around. Inside container `c1`:
+```sh
+# Exec into the first container c1
+$ kubectl exec -it sharevol -c c1 -- bash
+[root@sharevol /]#
+[root@sharevol /]# mount | grep xchange 
+/dev/sda1 on /tmp/xchange type ext4 (rw,relatime,commit=30,data=ordered)
+# Create a 
+[root@sharevol /]# cd /tmp/xchange/
+[root@sharevol xchange]# echo "Hannah! I love you babe :)" > love.txt
+[root@sharevol xchange]# cat love.txt 
+Hannah! I love you babe :)
+```
+
+Now, let's checkout the second container `c2`:
+```sh
+$ kubectl exec -it sharevol -c c2 -- bash
+[root@sharevol /]# cd /temp/data/
+# Guess what!? The love.txt file which we created 
+# in the first container is available here
+[root@sharevol data]# ls
+love.txt
+# Let's peek into the content too
+[root@sharevol data]# cat love.txt 
+Hannah! I love you babe :)
+```
+
+> Note that in each container you need to decide where to mount the volume and that for `emptyDir` you currently **can not** specify resource consumption limits.
+
+Clean up time:
+```sh
+$ kubectl delete pods --all
+pod "sharevol" deleted
+```
 [1]: http://kubernetesbyexample.com
 [2]: https://github.com/openshift-evangelists/kbe
