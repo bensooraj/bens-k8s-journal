@@ -16,6 +16,7 @@ This is a journal of me walking through the entire [Kubernetes By Example][1] ex
 12. [Volumes](#volumes)
 13. [Secrets](#secrets)
 14. [Logging](#logging)
+15. [Jobs](#jobs)
 
 ### Check config details
 ```sh
@@ -1270,5 +1271,75 @@ pod "logme" deleted
 pod "oneshot" deleted
 ```
 
+### Jobs
+
+> A job in Kubernetes is a supervisor for pods carrying out batch processes, that is, a process that runs for a certain time to completion, for example a calculation or a backup operation.
+
+```sh
+# Create a job called countdown that supervises a pod counting from 9 down to 1:
+$ kubectl apply -f jobs/job.yaml
+job.batch/countdown created
+
+# List the job
+$ kubectl get jobs -o wide
+NAME        DESIRED   SUCCESSFUL   AGE   CONTAINERS   IMAGES     SELECTOR
+countdown   1         1            31s   counter      centos:7   controller-uid=04f4458c-4dbc-11e9-a1d6-42010aa00ff8
+
+# List the pods as well
+$ kubectl get pods -o wide
+NAME              READY   STATUS      RESTARTS   AGE   IP          NODE                                            NOMINATED NODE
+countdown-td4vz   0/1     Completed   0          2m    10.12.1.9   gke-k8s-by-example-default-pool-635ddecf-1xsh   <none>
+
+# Decribe a job
+$ kubectl describe jobs countdown
+Name:           countdown
+Namespace:      default
+Selector:       controller-uid=04f4458c-4dbc-11e9-a1d6-42010aa00ff8
+Labels:         controller-uid=04f4458c-4dbc-11e9-a1d6-42010aa00ff8
+                job-name=countdown
+Parallelism:    1
+Completions:    1
+Start Time:     Sun, 24 Mar 2019 04:05:54 +0530
+Completed At:   Sun, 24 Mar 2019 04:05:55 +0530
+Duration:       1s
+Pods Statuses:  0 Running / 1 Succeeded / 0 Failed
+Pod Template:
+  Labels:  controller-uid=04f4458c-4dbc-11e9-a1d6-42010aa00ff8
+           job-name=countdown
+  Containers:
+   counter:
+    Image:      centos:7
+    Port:       <none>
+    Host Port:  <none>
+    Command:
+      bin/bash
+      -c
+      for i in 9 8 7 6 5 4 3 2 1 ; do echo $i ; done
+    Environment:  <none>
+    Mounts:       <none>
+  Volumes:        <none>
+Events:
+  Type    Reason            Age    From            Message
+  ----    ------            ----   ----            -------
+  Normal  SuccessfulCreate  3m55s  job-controller  Created pod: countdown-td4vz
+
+# Checkout the output of the logs as well
+$ kubectl logs countdown-td4vz
+9
+8
+7
+6
+5
+4
+3
+2
+1
+```
+
+Clean up time:
+```sh
+$ kubectl delete jobs countdown
+job.batch "countdown" deleted
+```
 [1]: http://kubernetesbyexample.com
 [2]: https://github.com/openshift-evangelists/kbe
