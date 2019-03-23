@@ -14,6 +14,7 @@ This is a journal of me walking through the entire [Kubernetes By Example][1] ex
 10. [Environment Variables](#environment-variables)
 11. [Namespaces](#namespaces)
 12. [Volumes](#volumes)
+13. [Secrets](#secrets)
 
 ### Check config details
 ```sh
@@ -1143,5 +1144,70 @@ Clean up time:
 $ kubectl delete pods --all
 pod "sharevol" deleted
 ```
+
+### Secrets
+
+>  Secrets provide you with a mechanism to use information  such as database passwords or an API keys in a safe (non-plain text) and reliable way with the following properties:
+
+* Secrets are namespaced objects, that is, exist in the context of a `namespace`
+* You can access them via a volume or an environment variable from a container running in a pod
+* The secret data on nodes is stored in `tmpfs` volumes
+* A per-secret size limit of `1MB` exists
+* The API server stores secrets as plaintext in etcd
+
+```sh
+# Dump some random text to the file secrets/api-key.txt
+$ echo -n "k2hl1bflkh4lk23b41lkdlk23b4l341234" > secrets/api-key.txt
+
+# Create a new secret named apikey using the file secrets/api-key.txt
+$ kubectl create secret generic apikey --from-file=secrets/api-key.txt
+secret/apikey created
+
+# Describe the secret we just created
+$ kubectl describe secrets apikey
+Name:         apikey
+Namespace:    default
+Labels:       <none>
+Annotations:  <none>
+
+Type:  Opaque
+
+Data
+====
+api-key.txt:  34 bytes
+```
+
+Let's now use the secret that we just created
+```sh
+# Create a pod which uses the secret apikey
+$ kubectl apply -f secrets/pod.yaml
+pod/pod-with-secret created
+
+# List the pod
+$ kubectl get pods -o wide
+NAME              READY   STATUS    RESTARTS   AGE   IP          NODE                                            NOMINATED NODE
+pod-with-secret   1/1     Running   0          4m    10.12.1.6   gke-k8s-by-example-default-pool-635ddecf-1xsh   <none>
+
+# Get inside the pod
+$ kubectl exec -it pod-with-secret -- bash
+
+# You can see secret file api-key.txt at "tmp/apikey/"
+[root@pod-with-secret /]# ls tmp/apikey/
+api-key.txt
+
+# Let's checkout out its content
+[root@pod-with-secret /]# cat tmp/apikey/api-key.txt 
+k2hl1bflkh4lk23b41lkdlk23b4l341234
+```
+
+> Note that for service accounts Kubernetes automatically creates secrets containing credentials for accessing the API and modifies your pods to use this type of secret.
+
+
+Clean up time:
+```sh
+$ kubectl delete pods --all
+pod "pod-with-secret" deleted
+```
+
 [1]: http://kubernetesbyexample.com
 [2]: https://github.com/openshift-evangelists/kbe
