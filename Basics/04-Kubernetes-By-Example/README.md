@@ -15,6 +15,7 @@ This is a journal of me walking through the entire [Kubernetes By Example][1] ex
 11. [Namespaces](#namespaces)
 12. [Volumes](#volumes)
 13. [Secrets](#secrets)
+14. [Logging](#logging)
 
 ### Check config details
 ```sh
@@ -1202,11 +1203,71 @@ k2hl1bflkh4lk23b41lkdlk23b4l341234
 
 > Note that for service accounts Kubernetes automatically creates secrets containing credentials for accessing the API and modifies your pods to use this type of secret.
 
-
 Clean up time:
 ```sh
 $ kubectl delete pods --all
 pod "pod-with-secret" deleted
+```
+
+### Logging
+
+> Logging is one option to understand what is going on inside your applications and the cluster at large. Basic logging in Kubernetes makes the output a container produces available, which is a good use case for debugging. 
+
+Create a pod `logme` that writes to `stdout` and `stderr`:
+```sh
+# Create the pod using logging/pod.yaml
+$ kubectl apply -f logging/pod.yaml
+pod/logme created
+
+# View the five most recent log lines of the gen container in the logme pod
+$ kubectl logs --tail=5 logme -c gen
+Sat Mar 23 21:55:51 UTC 2019
+Sat Mar 23 21:55:52 UTC 2019
+Sat Mar 23 21:55:52 UTC 2019
+Sat Mar 23 21:55:53 UTC 2019
+Sat Mar 23 21:55:53 UTC 2019
+
+# Stream the log of the gen container in the logme pod
+$ kubectl logs -f --since=5s logme -c gen
+Sat Mar 23 21:57:28 UTC 2019
+Sat Mar 23 21:57:28 UTC 2019
+Sat Mar 23 21:57:29 UTC 2019
+Sat Mar 23 21:57:29 UTC 2019
+.......
+......
+.....
+....
+...
+..
+.
+```
+
+> ..if you wouldn’t have specified --since=10s in the above command, you would have gotten all log lines from the start of the container. ...You can also view logs of pods that have already completed their lifecycle.
+```sh
+# Create a new pod which counts down from 9 to 1
+$ kubectl apply -f logging/oneshot.yaml
+pod/oneshot created
+
+# Let's log it out
+$ kubectl logs -p oneshot -c gen
+9
+8
+7
+6
+5
+4
+3
+2
+1
+```
+
+> Using the -p option you can print the logs for previous instances of the container in a pod
+
+Clean up time:
+```sh
+$ kubectl delete pods --all
+pod "logme" deleted
+pod "oneshot" deleted
 ```
 
 [1]: http://kubernetesbyexample.com
