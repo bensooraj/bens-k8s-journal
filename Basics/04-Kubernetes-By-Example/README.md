@@ -18,6 +18,7 @@ This is a journal of me walking through the entire [Kubernetes By Example][1] ex
 14. [Logging](#logging)
 15. [Jobs](#jobs)
 16. [StatefulSet](#statefulset)
+17. [Init Containers](#init-containers)
 
 ### Check config details
 ```sh
@@ -1464,7 +1465,46 @@ service "mehdb" deleted
 
 This exercise wasn't very successful though. :-/
 
+### Init Containers
 
+> It’s sometimes necessary to prepare a container running in a pod. For example, you might want to wait for a service being available, want to configure things at runtime, or init some data in a database. In all of these cases, init containers are useful. Note that Kubernetes will execute all init containers (and they must all exit successfully) before the main container(s) are executed.
+
+```sh
+# Create a deployment consisting of an init container that writes a message into a file at /ic/this and the main (long-running) container reading out this file:
+$ kubectl apply -f init-containers/deploy.yaml
+deployment.apps/ic-deploy created
+
+# List the deployment and the pod
+$ kubectl get deploy,po -o wide
+NAME                              DESIRED   CURRENT   UP-TO-DATE   AVAILABLE   AGE   CONTAINERS   IMAGES     SELECTOR
+deployment.extensions/ic-deploy   1         1         1            1           29s   main         centos:7   app=ic
+
+NAME                            READY   STATUS    RESTARTS   AGE   IP           NODE                                            NOMINATED NODE
+pod/ic-deploy-bf75cbf87-z8nh5   1/1     Running   0          30s   10.12.1.14   gke-k8s-by-example-default-pool-635ddecf-1xsh   <none>
+
+# Check the pod logs
+$ kubectl logs ic-deploy-bf75cbf87-z8nh5 -f
+INIT_DONE
+INIT_DONE
+INIT_DONE
+INIT_DONE
+INIT_DONE
+^C
+```
+
+Clean up time!
+```sh
+# Delete the deployment
+$ kubectl delete deployments --all
+deployment.extensions "ic-deploy" deleted
+
+# And the pods are terminating, it can take some time
+$ kubectl get deploy,po -o wide
+NAME                            READY   STATUS        RESTARTS   AGE   IP           NODE                                            NOMINATED NODE
+pod/ic-deploy-bf75cbf87-z8nh5   0/1     Terminating   0          7m    10.12.1.14   gke-k8s-by-example-default-pool-635ddecf-1xsh   <none>
+```
+
+Time to move on though!
 
 [1]: http://kubernetesbyexample.com
 [2]: https://github.com/openshift-evangelists/kbe
