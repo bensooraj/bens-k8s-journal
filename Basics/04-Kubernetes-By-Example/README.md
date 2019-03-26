@@ -17,6 +17,7 @@ This is a journal of me walking through the entire [Kubernetes By Example][1] ex
 13. [Secrets](#secrets)
 14. [Logging](#logging)
 15. [Jobs](#jobs)
+16. [StatefulSet](#statefulset)
 
 ### Check config details
 ```sh
@@ -1341,5 +1342,130 @@ Clean up time:
 $ kubectl delete jobs countdown
 job.batch "countdown" deleted
 ```
+
+### StatefulSet
+
+> If you have a stateless app you want to use a `Deployment`. However, for a stateful app you might want to use a `StatefulSet`. Unlike a `Deployment`, the `StatefulSet` provides certain guarantees about the identity of the pods it is managing (that is, predictable names) and about the startup order. Two more things that are different compared to a `Deployment`: for network communication you need to create a `headless services` and for persistency the `StatefulSet` manages a `persistent volume` per pod.
+
+We will be using an [educational Kubernetes-native NoSQL datastore][3] called `mehdb` for this exercise.
+
+```sh
+# Verify if the yaml file is fine
+$ kubectl apply -f statefulset/mehdb-sts-svc.yaml --dry-run=true
+statefulset.apps/mehdb created (dry run)
+service/mehdb created (dry run)
+
+# Create the statefulset along with the persistent volume and the headless service
+$ kubectl apply -f statefulset/mehdb-sts-svc.yaml
+statefulset.apps/mehdb created
+service/mehdb created
+
+# You can see how the pods are created in order
+$ kubectl get pods -o wide -w
+NAME      READY   STATUS              RESTARTS   AGE   IP       NODE                                            NOMINATED NODE
+mehdb-0   0/1     ContainerCreating   0          24s   <none>   gke-k8s-by-example-default-pool-635ddecf-1xsh   <none>
+mehdb-0   0/1   Running   0     43s   10.12.1.10   gke-k8s-by-example-default-pool-635ddecf-1xsh   <none>
+mehdb-0   1/1   Running   0     86s   10.12.1.10   gke-k8s-by-example-default-pool-635ddecf-1xsh   <none>
+mehdb-1   0/1   Pending   0     0s    <none>   <none>   <none>
+mehdb-1   0/1   Pending   0     0s    <none>   <none>   <none>
+mehdb-1   0/1   Pending   0     5s    <none>   <none>   <none>
+mehdb-1   0/1   Pending   0     5s    <none>   gke-k8s-by-example-default-pool-635ddecf-30n4   <none>
+mehdb-1   0/1   ContainerCreating   0     5s    <none>   gke-k8s-by-example-default-pool-635ddecf-30n4   <none>
+mehdb-1   0/1   Running   0     32s   10.12.2.5   gke-k8s-by-example-default-pool-635ddecf-30n4   <none>
+mehdb-1   1/1   Running   0     56s   10.12.2.5   gke-k8s-by-example-default-pool-635ddecf-30n4   <none>
+```
+
+A summary of all the resources that have been created:
+
+```sh
+# Let's checkout all the resources created
+$ kubectl get sts,po,pvc,svc -o wide
+NAME                     DESIRED   CURRENT   AGE   CONTAINERS   IMAGES
+statefulset.apps/mehdb   2         2         8m    shard        quay.io/mhausenblas/mehdb:0.6
+
+NAME          READY   STATUS    RESTARTS   AGE   IP           NODE                                            NOMINATED NODE
+pod/mehdb-0   1/1     Running   0          8m    10.12.1.10   gke-k8s-by-example-default-pool-635ddecf-1xsh   <none>
+pod/mehdb-1   1/1     Running   0          7m    10.12.2.5    gke-k8s-by-example-default-pool-635ddecf-30n4   <none>
+
+NAME                                 STATUS   VOLUME                                     CAPACITY   ACCESS MODES   STORAGECLASS   AGE
+persistentvolumeclaim/data-mehdb-0   Bound    pvc-8a824c22-4f7e-11e9-9777-42010aa00008   1Gi        RWO            standard       8m
+persistentvolumeclaim/data-mehdb-1   Bound    pvc-be0d2686-4f7e-11e9-9777-42010aa00008   1Gi        RWO            standard       7m
+
+NAME                 TYPE        CLUSTER-IP    EXTERNAL-IP   PORT(S)    AGE   SELECTOR
+service/kubernetes   ClusterIP   10.15.240.1   <none>        443/TCP    2d    <none>
+service/mehdb        ClusterIP   None          <none>        9876/TCP   8m    app=mehdb
+```
+
+Let's access the `StatefulSet` via a jump pod:
+```sh
+# 
+$ kubectl run -it --rm jumppod --restart=Never --image=quay.io/mhausenblas/jump:0.2 -- sh
+If you do not see a command prompt, try pressing enter.
+~ $ 
+
+# The headless service itself has no cluster IP and has created two endpoints for the pods mehdb-0 and mehdb-1 respectively. The DNS configuration now returns A record entries for the pods
+~ $ nslookup mehdb
+nslookup: cannot resolve '(null)': Name does not resolve
+
+Name:      mehdb
+Address 1: 10.12.1.10 mehdb-0.mehdb.default.svc.cluster.local
+Address 2: 10.12.2.5 mehdb-1.mehdb.default.svc.cluster.local
+
+# Since there is no data in the datastore, /status?level=full should return a 0
+~ $ curl mehdb:9876/status?level=full
+0
+
+# Let's put some data now
+~ $ echo "test data" > /tmp/test
+~ $ cat /tmp/test 
+test data
+~ $ curl -sL -XPUT -T /tmp/test mehdb:9876/set/test
+open /mehdbdata/test/content: no such file or directory
+
+# Unable to set value for the key test. So logging out mehdb-0's activity reveals some
+# permissions issue. Will debug this later
+$ kubectl logs mehdb-0 -f
+2019/03/26 04:21:35 mehdb serving from mehdb-0:9876 using /mehdbdata as the data directory
+2019/03/26 04:21:35 I am the leading shard, accepting both WRITES and READS
+2019/03/26 05:09:14 Cannot write key test due to open /mehdbdata/test/content: no such file or directory
+
+# Found another issue
+$ kubectl logs mehdb-1 -f
+2019/03/26 05:29:48 Checking for new data from leader
+2019/03/26 05:29:48 Cannot get keys from leader due to Get http://mehdb-0.default:9876/keys: dial tcp: lookup mehdb-0.default on 10.15.240.10:53: no such host
+```
+
+`mehdb-1` should be querying at `mehdb-0.mehdb.default:9876/keys` instead of at `http://mehdb-0.default:9876/keys`.
+
+Clean up time!
+```sh
+$ kubectl delete sts mehdb
+statefulset.apps "mehdb" deleted
+
+# We are left with the persistent volume and the service
+$ kubectl get sts,po,pvc,svc -o wide
+NAME                                 STATUS   VOLUME                                     CAPACITY   ACCESS MODES   STORAGECLASS   AGE
+persistentvolumeclaim/data-mehdb-0   Bound    pvc-8a824c22-4f7e-11e9-9777-42010aa00008   1Gi        RWO            standard       1h
+persistentvolumeclaim/data-mehdb-1   Bound    pvc-be0d2686-4f7e-11e9-9777-42010aa00008   1Gi        RWO            standard       1h
+
+NAME                 TYPE        CLUSTER-IP    EXTERNAL-IP   PORT(S)    AGE   SELECTOR
+service/kubernetes   ClusterIP   10.15.240.1   <none>        443/TCP    2d    <none>
+service/mehdb        ClusterIP   None          <none>        9876/TCP   1h    app=mehdb
+
+# Explicity delete the persistentvolumeclaims
+$ for i in 0 1; do kubectl delete persistentvolumeclaims data-mehdb-$i; done
+persistentvolumeclaim "data-mehdb-0" deleted
+persistentvolumeclaim "data-mehdb-1" deleted
+
+# And the service as well
+$ kubectl delete service mehdb
+service "mehdb" deleted
+```
+
+This exercise wasn't very successful though. :-/
+
+
+
 [1]: http://kubernetesbyexample.com
 [2]: https://github.com/openshift-evangelists/kbe
+[3]: https://blog.openshift.com/kubernetes-statefulset-in-action/
