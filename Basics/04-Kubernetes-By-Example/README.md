@@ -19,6 +19,7 @@ This is a journal of me walking through the entire [Kubernetes By Example][1] ex
 15. [Jobs](#jobs)
 16. [StatefulSet](#statefulset)
 17. [Init Containers](#init-containers)
+18. [Nodes](#nodes)
 
 ### Check config details
 ```sh
@@ -1505,6 +1506,67 @@ pod/ic-deploy-bf75cbf87-z8nh5   0/1     Terminating   0          7m    10.12.1.1
 ```
 
 Time to move on though!
+
+### Nodes
+
+> ... nodes are the (virtual) machines where your workloads in shape of pods run.
+
+```sh
+# Let's list all the nodes:
+$ kubectl get nodes -o wide
+NAME                                            STATUS   ROLES    AGE   VERSION          INTERNAL-IP   EXTERNAL-IP      OS-IMAGE                             KERNEL-VERSION   CONTAINER-RUNTIME
+gke-k8s-by-example-default-pool-635ddecf-1xsh   Ready    <none>   3d    v1.11.7-gke.12   10.160.0.29   35.200.209.198   Container-Optimized OS from Google   4.14.91+         docker://17.3.2
+gke-k8s-by-example-default-pool-635ddecf-30n4   Ready    <none>   3d    v1.11.7-gke.12   10.160.0.30   35.244.18.55     Container-Optimized OS from Google   4.14.91+         docker://17.3.2
+gke-k8s-by-example-default-pool-635ddecf-ll16   Ready    <none>   3d    v1.11.7-gke.12   10.160.0.28   35.200.217.246   Container-Optimized OS from Google   4.14.91+         docker://17.3.2
+
+# Label one of the nodes
+$ kubectl label nodes gke-k8s-by-example-default-pool-635ddecf-1xsh shouldrun=here
+node/gke-k8s-by-example-default-pool-635ddecf-1xsh labeled
+
+# Now, create a pod to run on the specific node that we just labelled
+$ kubectl apply -f nodes/pod.yaml
+pod/onspecificnode created
+
+# It's running on gke-k8s-by-example-default-pool-635ddecf-1xsh, which is the one we labelled
+$ kubectl get po -o wide
+NAME             READY   STATUS    RESTARTS   AGE   IP           NODE                                            NOMINATED NODE
+onspecificnode   1/1     Running   0          38s   10.12.1.15   gke-k8s-by-example-default-pool-635ddecf-1xsh   <none>
+
+# You can learn more about node using describe (portion of the entire dump)
+$ kubectl describe nodes gke-k8s-by-example-default-pool-635ddecf-1xsh
+.
+.
+.
+Addresses:
+  InternalIP:  10.160.0.29
+  ExternalIP:  35.200.209.198
+  Hostname:    gke-k8s-by-example-default-pool-635ddecf-1xsh
+Capacity:
+ cpu:                1
+ ephemeral-storage:  98868448Ki
+ hugepages-2Mi:      0
+ memory:             3787656Ki
+ pods:               110
+Allocatable:
+ cpu:                940m
+ ephemeral-storage:  47093746742
+ hugepages-2Mi:      0
+ memory:             2702216Ki
+ pods:               110
+System Info:
+ Kernel Version:             4.14.91+
+ OS Image:                   Container-Optimized OS from Google
+ Operating System:           linux
+ Architecture:               amd64
+ Container Runtime Version:  docker://17.3.2
+ Kubelet Version:            v1.11.7-gke.12
+ Kube-Proxy Version:         v1.11.7-gke.12
+PodCIDR:                     10.12.1.0/24
+
+.
+.
+.
+```
 
 [1]: http://kubernetesbyexample.com
 [2]: https://github.com/openshift-evangelists/kbe
