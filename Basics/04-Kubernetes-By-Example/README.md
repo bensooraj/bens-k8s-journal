@@ -20,6 +20,7 @@ This is a journal of me walking through the entire [Kubernetes By Example][1] ex
 16. [StatefulSet](#statefulset)
 17. [Init Containers](#init-containers)
 18. [Nodes](#nodes)
+19. [API Server access](#api-server-access)
 
 ### Check config details
 ```sh
@@ -1568,6 +1569,94 @@ PodCIDR:                     10.12.1.0/24
 .
 ```
 
+### API Server access
+
+> Sometimes it’s useful or necessary to directly [access the Kubernetes API server][4], for exploratory or testing purposes.
+
+```sh
+# In one terminal, proxy the API to the local environment
+$ kubectl proxy --port=8080
+Starting to serve on 127.0.0.1:8080
+
+# In another terminal, access the API
+$ curl http://localhost:8080/api/v1
+{
+  "kind": "APIResourceList",
+  "groupVersion": "v1",
+  "resources": [
+    {
+      "name": "bindings",
+      "singularName": "",
+      "namespaced": true,
+      "kind": "Binding",
+      "verbs": [
+        "create"
+      ]
+    },
+    .
+    .
+    .
+    .
+    {
+      "name": "services/status",
+      "singularName": "",
+      "namespaced": true,
+      "kind": "Service",
+      "verbs": [
+        "get",
+        "patch",
+        "update"
+      ]
+    }
+  ]
+}
+```
+
+Another method:
+```sh
+# Use kubectl directly
+$ kubectl get --raw=/api/v1
+
+# Check supported API versions
+kubectl api-versions 
+.
+.
+apps/v1
+apps/v1beta1
+apps/v1beta2
+.
+.
+batch/v1
+batch/v1beta1
+.
+.
+v1
+
+# And resources (I am showing only a few)
+$ kubectl api-resources
+NAME                              SHORTNAMES   APIGROUP                       NAMESPACED   KIND
+configmaps                        cm                                          true         ConfigMap
+endpoints                         ep                                          true         Endpoints
+events                            ev                                          true         Event
+namespaces                        ns                                          false        Namespace
+nodes                             no                                          false        Node
+persistentvolumeclaims            pvc                                         true         PersistentVolumeClaim
+persistentvolumes                 pv                                          false        PersistentVolume
+pods                              po                                          true         Pod
+replicationcontrollers            rc                                          true         ReplicationController
+secrets                                                                       true         Secret
+serviceaccounts                   sa                                          true         ServiceAccount
+services                          svc                                         true         Service
+daemonsets                        ds           apps                           true         DaemonSet
+deployments                       deploy       apps                           true         Deployment
+replicasets                       rs           apps                           true         ReplicaSet
+statefulsets                      sts          apps                           true         StatefulSet
+cronjobs                          cj           batch                          true         CronJob
+jobs                                           batch                          true         Job
+storageclasses                    sc           storage.k8s.io                 false        StorageClass
+```
+
 [1]: http://kubernetesbyexample.com
 [2]: https://github.com/openshift-evangelists/kbe
 [3]: https://blog.openshift.com/kubernetes-statefulset-in-action/
+[4]: https://kubernetes.io/docs/tasks/access-kubernetes-api/http-proxy-access-api/
